@@ -8,8 +8,9 @@ it measures every label in physical units and writes a self-contained HTML page
 you can open, share or host.
 
 **[Live demo](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)**
-— a liver with eleven tumours, from MSD Task03. Drag to orbit, drop the opacity
-to see the lesions inside the organ, or cut through it with the clip plane.
+— case `liver_108` from MSD Task03: 57 tumours at 43% hepatic burden, the
+heaviest case in the cohort. Drag to orbit, drop the opacity to see the lesions
+inside the organ, or cut through it with the clip plane.
 
 ```bash
 nrrdvis view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
@@ -53,6 +54,7 @@ Neither fact is visible from a rendering alone.
 - [The viewer](#the-viewer)
 - [Measurements](#measurements)
 - [How it is validated](#how-it-is-validated)
+- [What 131 livers looked like](#what-131-livers-looked-like)
 - [Python API](#python-api)
 - [What changed from v1](#what-changed-from-v1)
 - [Layout](#layout)
@@ -202,6 +204,63 @@ so a regression in the fix is visible rather than silent.
 pytest              # 113 tests, including 39 headless checks on the generated viewer
 ruff check src tests
 ```
+
+## What 131 livers looked like
+
+`examples/cohort_report.py` measures every case in a dataset in parallel and
+reports what disagrees with the cohort. On MSD Task03 Liver (131 cases,
+CC-BY-SA 4.0):
+
+```
+slice thickness (mm)  0.70 to 5.00   median 1.00
+in-plane spacing (mm) 0.557 to 1.000  median 0.768
+anisotropy (z / x)    1.2x median, up to 9.0x
+
+organ volume (mL)     542 to 3195   median 1592   IQR 1380-1850
+organ components      1 to 1777   93 case(s) not a single connected region
+  stray volume (mm3)  0.0 to 4573.0   median 8.8   worst 0.360% of its organ
+
+cases with lesions    117 of 131
+lesions per case      1 to 62   median 3   total 753
+lesion burden (%)     0.01 to 45.8   median 0.97
+largest lesion Ø (mm) 10 to 241   median 40
+```
+
+Three things worth drawing out.
+
+**Slice thickness spans 7x within one dataset**, and anisotropy reaches 9:1.
+Any pipeline with kernel sizes tuned in voxels behaves differently across this
+cohort without saying so. This is the concrete reason v1's `np.ones((15, 15))`
+had to become a millimetre radius.
+
+**71% of liver labels are not a single connected region** — but the median
+stray volume is 8.8 mm³, and the worst case is 0.36% of its organ.
+`liver_116` reports 395 components at face-adjacency and 27 at 26-adjacency;
+232 of those "components" are single voxels touching the main body only at a
+corner. The count is an artifact of the connectivity choice. Stray volume is
+the number that means something, which is why the report leads with it.
+
+**Fragmentation correlates with low sphericity, but mostly for a boring
+reason.** Across the cohort, `n_components` against sphericity gives Spearman
+ρ = −0.58 (p = 2×10⁻¹³), which invites the conclusion that annotation speckle
+inflates surface area and drags shape metrics down. It does not survive
+scrutiny: `n_components` and tumour burden correlate at ρ = +0.85, so heavily
+diseased livers are both genuinely more irregular *and* more fragmented.
+Controlling for burden, the partial correlation falls to −0.32. A residual
+association remains, but observational data cannot separate "speckle inflates
+area" from "disease does both", and the honest reading is that most of the
+headline effect is confounded.
+
+Reproduce with:
+
+```bash
+python examples/cohort_report.py /path/to/Task03_Liver \
+    --organ 1 --lesion 2 --min-lesion-mm3 100 --workers 20 \
+    --out outputs/liver_cohort.jsonl
+```
+
+Records stream to JSONL and the run resumes from whatever is already there, so
+an interrupted scan over 131 large volumes keeps its work.
 
 ## Python API
 
