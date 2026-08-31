@@ -38,9 +38,18 @@ def render(scene: Scene, standalone: bool = True) -> str:
     centre = ((lo + hi) / 2.0).tolist()
     radius = float(np.linalg.norm(hi - lo)) / 2.0 or 100.0
 
+    volumes = [m.volume_ml for m in scene.measurements]
+    summary = {
+        "n_structures": len(scene.measurements),
+        "total_volume_ml": float(sum(volumes)),
+        "largest_volume_ml": float(max(volumes)) if volumes else 0.0,
+        "n_flagged": sum(1 for m in scene.measurements if m.resolution_limited),
+    }
+
     payload = {
         "title": scene.title,
         "subtitle": scene.subtitle,
+        "summary": summary,
         "centre": centre,
         "radius": radius,
         "bounds": {"min": lo.tolist(), "max": hi.tolist()},
@@ -90,80 +99,125 @@ def _escape(text: str) -> str:
 _TEMPLATE = r"""<title>__TITLE__</title>
 <style>
   :root{
-    --bg:#f4f4f2; --panel:#ffffff; --ink:#1c1c1a; --muted:#6b6b66;
-    --line:#dedcd6; --accent:#2f6f9f; --stage-top:#e8e8e4; --stage-bot:#cfcfc9;
-    --shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.06);
+    /* Neutrals carry a slight cool bias toward the steel accent, so the panel
+       reads as an instrument surface rather than as undecided grey. --warn is
+       deliberately not the accent: it encodes data quality and must not be
+       mistaken for an interactive affordance. */
+    --bg:#eceef0; --panel:#fafbfc; --ink:#181c20; --muted:#5f6a73;
+    --line:#d8dde2; --line-soft:#e6eaee; --accent:#2f6f9f; --accent-ink:#ffffff;
+    --warn:#8a6a1f; --warn-bg:#f5edd8;
+    --stage-bot:#c7ccd1; --hover:#eef1f4; --focus:#2f6f9f;
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){
-      --bg:#16181a; --panel:#1e2124; --ink:#e8e6e1; --muted:#9a9892;
-      --line:#31353a; --accent:#7fb2dc; --stage-top:#232629; --stage-bot:#111315;
-      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+      --bg:#101317; --panel:#181c21; --ink:#e6e9ec; --muted:#98a2ab;
+      --line:#2b3138; --line-soft:#232930; --accent:#7fb2dc; --accent-ink:#0e1216;
+      --warn:#d9bd72; --warn-bg:#2e2717;
+      --stage-bot:#0c0e11; --hover:#1e242a; --focus:#7fb2dc;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#16181a; --panel:#1e2124; --ink:#e8e6e1; --muted:#9a9892;
-    --line:#31353a; --accent:#7fb2dc; --stage-top:#232629; --stage-bot:#111315;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+    --bg:#101317; --panel:#181c21; --ink:#e6e9ec; --muted:#98a2ab;
+    --line:#2b3138; --line-soft:#232930; --accent:#7fb2dc; --accent-ink:#0e1216;
+    --warn:#d9bd72; --warn-bg:#2e2717;
+    --stage-bot:#0c0e11; --hover:#1e242a; --focus:#7fb2dc;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  #app{display:grid;grid-template-columns:296px 1fr;height:100vh;height:100dvh;}
+    font:400 13px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  #app{display:grid;grid-template-columns:300px 1fr;height:100vh;height:100dvh;}
   #panel{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;
     display:flex;flex-direction:column;}
   #stage{position:relative;min-width:0;background:var(--stage-bot);}
   canvas{display:block;width:100%;height:100%}
-  .sec{padding:14px 16px;border-bottom:1px solid var(--line)}
+
+  /* Type scale: 10 / 12 / 13 / 15. Four steps, nothing between them. */
+  .sec{padding:15px 16px;border-bottom:1px solid var(--line)}
   .sec:last-child{border-bottom:none}
-  h1{font-size:15px;margin:0;letter-spacing:-.01em;font-weight:650}
-  .sub{color:var(--muted);font-size:12px;margin-top:3px;word-break:break-word}
+  h1{font-size:15px;margin:0;letter-spacing:-.012em;font-weight:650;
+    text-wrap:balance;line-height:1.3}
+  .sub{color:var(--muted);font-size:12px;margin-top:4px;word-break:break-word}
   h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
-    margin:0 0 9px;font-weight:650}
-  .row{display:flex;align-items:center;gap:9px;padding:5px 0}
+    margin:0 0 10px;font-weight:650}
+
+  /* Summary reads before the per-structure detail. */
+  #sum{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:11px 12px}
+  #sum div{min-width:0}
+  #sum dt{font-size:10px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--muted);margin-bottom:2px}
+  #sum dd{margin:0;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;
+    letter-spacing:-.015em}
+  #sum dd small{font-size:11px;font-weight:400;color:var(--muted);margin-left:1px}
+
+  .row{display:flex;align-items:center;gap:9px;border-radius:6px;
+    padding:5px 6px;margin:0 -6px;transition:background .12s}
+  .row:hover{background:var(--hover)}
   .row label{display:flex;align-items:center;gap:9px;cursor:pointer;flex:1;min-width:0}
-  .sw{width:11px;height:11px;border-radius:3px;flex:none;
-    box-shadow:0 0 0 1px rgba(0,0,0,.18) inset}
+  .sw{width:10px;height:10px;border-radius:2.5px;flex:none;
+    box-shadow:0 0 0 1px rgba(0,0,0,.22) inset}
   .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .val{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;flex:none}
-  input[type=checkbox]{accent-color:var(--accent);flex:none;margin:0}
-  input[type=range]{width:100%;accent-color:var(--accent);margin:2px 0}
-  .ctl{margin-bottom:11px}
+  input[type=checkbox]{accent-color:var(--accent);flex:none;margin:0;cursor:pointer}
+  input[type=range]{width:100%;accent-color:var(--accent);margin:3px 0;cursor:pointer}
+
+  .ctl{margin-bottom:12px}
   .ctl:last-child{margin-bottom:0}
-  .ctl > span{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);
-    margin-bottom:2px}
+  .ctl > span{display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;color:var(--muted);margin-bottom:3px;gap:8px}
+  .ctl b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
   .btns{display:flex;gap:6px;flex-wrap:wrap}
-  button{font:inherit;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer;
-    border:1px solid var(--line);background:transparent;color:var(--ink)}
-  button:hover{border-color:var(--accent);color:var(--accent)}
-  button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
-  select{font:inherit;font-size:12px;padding:4px 7px;border-radius:7px;
-    border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+  button{font:inherit;font-size:12px;padding:5px 10px;border-radius:6px;cursor:pointer;
+    border:1px solid var(--line);background:transparent;color:var(--ink);
+    transition:background .12s,border-color .12s,color .12s}
+  button:hover{background:var(--hover);border-color:var(--muted)}
+  button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);
+    color:var(--accent-ink)}
+  select{font:inherit;font-size:12px;padding:3px 6px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+
   table{width:100%;border-collapse:collapse;font-size:12px;
     font-variant-numeric:tabular-nums}
-  th{text-align:right;font-weight:600;color:var(--muted);padding:3px 0;
-    border-bottom:1px solid var(--line);font-size:10.5px;text-transform:uppercase;
-    letter-spacing:.05em}
+  th{text-align:right;font-weight:650;color:var(--muted);padding:0 0 5px;
+    border-bottom:1px solid var(--line);font-size:10px;text-transform:uppercase;
+    letter-spacing:.06em;white-space:nowrap}
   th:first-child{text-align:left}
-  td{padding:4px 0;border-bottom:1px solid var(--line);text-align:right}
-  td:first-child{text-align:left;max-width:110px;overflow:hidden;
+  td{padding:5px 0;border-bottom:1px solid var(--line-soft);text-align:right}
+  td:first-child{text-align:left;max-width:104px;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
   tr:last-child td{border-bottom:none}
-  .flag{color:var(--muted);cursor:help}
-  dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px}
-  dt{color:var(--muted)}
-  dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+
+  /* Data quality reads as a chip, not a footnote glyph. */
+  .chip{display:inline-block;margin-left:5px;padding:0 4px;border-radius:3px;
+    background:var(--warn-bg);color:var(--warn);font-size:9.5px;font-weight:650;
+    letter-spacing:.05em;text-transform:uppercase;vertical-align:1px;cursor:help}
+  .note{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted);
+    display:flex;gap:6px;align-items:flex-start}
+  .note .chip{margin:0;flex:none;margin-top:1px}
+
+  dl#prov{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}
+  dl#prov dt{color:var(--muted)}
+  dl#prov dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;
+    word-break:break-word}
+
   #hud{position:absolute;left:14px;bottom:12px;color:var(--muted);font-size:11px;
-    pointer-events:none;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px var(--stage-bot)}
+    pointer-events:none;font-variant-numeric:tabular-nums}
   #scale{position:absolute;right:16px;bottom:12px;color:var(--muted);font-size:11px;
-    text-align:center;pointer-events:none}
-  #scalebar{height:3px;background:currentColor;opacity:.65;margin-bottom:3px;border-radius:2px}
-  #err{position:absolute;inset:0;display:none;place-items:center;padding:24px;
-    text-align:center;color:var(--muted);font-size:13px}
+    text-align:center;pointer-events:none;font-variant-numeric:tabular-nums}
+  #scalebar{height:3px;background:currentColor;opacity:.7;margin-bottom:3px;border-radius:2px}
+  #err{position:absolute;inset:0;display:none;place-items:center;padding:28px;
+    text-align:center;color:var(--muted);font-size:13px;line-height:1.5}
+  #hint{position:absolute;left:14px;top:12px;color:var(--muted);font-size:11px;
+    pointer-events:none;opacity:.85}
+
+  @media (prefers-reduced-motion:reduce){ *{transition-duration:.01ms !important} }
   @media (max-width:760px){
     #app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
-    #panel{order:2;border-right:none;border-top:1px solid var(--line);max-height:44vh}
+    #panel{order:2;border-right:none;border-top:1px solid var(--line);max-height:46vh}
     #stage{order:1}
+    #hint{display:none}
   }
 </style>
 
@@ -172,6 +226,10 @@ _TEMPLATE = r"""<title>__TITLE__</title>
     <div class="sec">
       <h1 id="ttl"></h1>
       <div class="sub" id="sub"></div>
+    </div>
+    <div class="sec">
+      <h2>Summary</h2>
+      <dl id="sum"></dl>
     </div>
     <div class="sec">
       <h2>Structures</h2>
@@ -211,6 +269,7 @@ _TEMPLATE = r"""<title>__TITLE__</title>
     </div>
   </aside>
   <div id="stage">
+    <div id="hint">drag to orbit &middot; scroll to zoom &middot; shift-drag to pan</div>
     <div id="hud"></div>
     <div id="scale"><div id="scalebar"></div><span id="scaletx"></span></div>
     <div id="err"></div>
@@ -348,6 +407,24 @@ _TEMPLATE = r"""<title>__TITLE__</title>
     document.getElementById('ttl').textContent = SCENE.title;
     document.getElementById('sub').textContent = SCENE.subtitle;
 
+    var sum = SCENE.summary || {};
+    var sumEl = document.getElementById('sum');
+    function stat(label, value, unit){
+      var wrap = document.createElement('div');
+      var dt = document.createElement('dt'); dt.textContent = label;
+      var dd = document.createElement('dd'); dd.textContent = value;
+      if (unit){
+        var u = document.createElement('small'); u.textContent = unit;
+        dd.appendChild(u);
+      }
+      wrap.appendChild(dt); wrap.appendChild(dd); sumEl.appendChild(wrap);
+    }
+    var totalFaces = SCENE.structures.reduce(function(a, st){ return a + st.n_faces; }, 0);
+    stat('Structures', String(sum.n_structures != null ? sum.n_structures : 0));
+    stat('Total volume', (sum.total_volume_ml || 0).toFixed(1), ' mL');
+    stat('Largest', (sum.largest_volume_ml || 0).toFixed(1), ' mL');
+    stat('Triangles', totalFaces.toLocaleString());
+
     var list = document.getElementById('list');
     SCENE.structures.forEach(function(s, i){
       var vol = s.metadata && s.metadata.volume_ml;
@@ -372,14 +449,30 @@ _TEMPLATE = r"""<title>__TITLE__</title>
     var tbl = document.getElementById('tbl');
     var head = '<tr><th>structure</th><th>vol mL</th><th>max &#216; mm</th><th>spher.</th></tr>';
     var rows = SCENE.measurements.map(function(m){
+      // Encoded as a chip rather than a footnote glyph, so a reader scanning
+      // the column sees which rows to discount without hunting for a legend.
       var flag = m.resolution_limited
-        ? ' <span class="flag" title="Spans under 5 voxels on its thinnest axis; shape figures are indicative only.">*</span>'
+        ? ' <span class="chip" title="Spans under 5 voxels on its thinnest axis.' +
+          ' Volume and diameter hold; shape figures are indicative only.">thin</span>'
         : '';
       return '<tr><td>' + esc(m.name) + flag + '</td><td>' + m.volume_ml.toFixed(1) +
         '</td><td>' + m.max_diameter_mm.toFixed(1) +
         '</td><td>' + m.sphericity.toFixed(2) + '</td></tr>';
     }).join('');
     tbl.innerHTML = head + (rows || '<tr><td colspan="4">no labels</td></tr>');
+
+    if (sum.n_flagged) {
+      var note = document.createElement('div');
+      note.className = 'note';
+      var chip = document.createElement('span');
+      chip.className = 'chip'; chip.textContent = 'thin';
+      var text = document.createElement('span');
+      text.textContent = sum.n_flagged + ' of ' + sum.n_structures +
+        ' structures span under 5 voxels on their thinnest axis.' +
+        ' Volume and diameter hold; shape figures are indicative only.';
+      note.appendChild(chip); note.appendChild(text);
+      tbl.parentNode.appendChild(note);
+    }
 
     var prov = document.getElementById('prov'), html = '';
     Object.keys(SCENE.provenance).forEach(function(k){
@@ -432,6 +525,11 @@ _TEMPLATE = r"""<title>__TITLE__</title>
   });
 
   var spinBtn = document.getElementById('spin'), spinning = false;
+  // Spin never starts on its own, so a viewer who asked the OS for reduced
+  // motion is never given movement they did not request. If they turn it on
+  // deliberately it runs, but gently.
+  var reduceMotion = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   spinBtn.addEventListener('click', function(){
     spinning = !spinning; spinBtn.setAttribute('aria-pressed', String(spinning));
   });
@@ -475,7 +573,7 @@ _TEMPLATE = r"""<title>__TITLE__</title>
   window.addEventListener('resize', resize);
 
   function frame(){
-    if (spinning){ cam.theta += 0.0035; place(); }
+    if (spinning){ cam.theta += reduceMotion ? 0.0012 : 0.0035; place(); }
     updateScale();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);

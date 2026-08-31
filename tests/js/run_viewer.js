@@ -85,6 +85,24 @@ check('structure names listed',
     === payload.structures.map((s) => s.name).join('|'));
 check('measurement rows rendered',
   doc.querySelectorAll('#tbl tr').length === payload.measurements.length + 1);
+
+// --- summary ----------------------------------------------------------------
+check('summary tiles rendered', doc.querySelectorAll('#sum div').length === 4);
+check('structure count in the summary',
+  doc.querySelector('#sum dd').textContent === String(payload.summary.n_structures));
+const totalTile = [...doc.querySelectorAll('#sum div')]
+  .find((d) => /total volume/i.test(d.querySelector('dt').textContent));
+check('total volume tile present and numeric',
+  totalTile && /^\d/.test(totalTile.querySelector('dd').textContent));
+
+const flagged = payload.measurements.filter((m) => m.resolution_limited).length;
+check('summary flag count matches the measurements',
+  payload.summary.n_flagged === flagged);
+check('a chip per flagged row',
+  doc.querySelectorAll('#tbl .chip').length === flagged,
+  `${doc.querySelectorAll('#tbl .chip').length} chips for ${flagged} flagged`);
+check('explanatory note shown only when something is flagged',
+  (doc.querySelectorAll('.note').length > 0) === (flagged > 0));
 check('acquisition facts rendered',
   doc.querySelectorAll('#prov dt').length === Object.keys(payload.provenance).length);
 check('triangle count in the HUD',
