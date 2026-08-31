@@ -199,7 +199,7 @@ tested; the tests pin both the corrected value *and* the uncorrected artifact,
 so a regression in the fix is visible rather than silent.
 
 ```bash
-pytest              # 95 tests
+pytest              # 113 tests, including 39 headless checks on the generated viewer
 ruff check src tests
 ```
 
@@ -280,7 +280,8 @@ the whole volume.
 Plotly's `create_trisurf`, which serialises every vertex as decimal text and
 inlines the whole plotly.js bundle. The committed `temp-plot.html` was 18 MB
 for a single structure. Meshes are now decimated to a budget and shipped as
-base64 binary: a five-structure scene is under 1 MB.
+base64 binary: the five-structure phantom scene is 902 KB, and the twelve-structure
+liver scene above is 1.5 MB.
 
 **Nothing was runnable by anyone else.** Every path was `E:/Desktop/`, the
 patient list was `range(1, 21)`, there was no README, no requirements, no
