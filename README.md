@@ -7,19 +7,41 @@ Point it at any labelled segmentation — CT or MR, one structure or thirty — 
 it measures every label in physical units and writes a self-contained HTML page
 you can open, share or host.
 
+**[Live demo](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)**
+— a liver with eleven tumours, from MSD Task03. Drag to orbit, drop the opacity
+to see the lesions inside the organ, or cut through it with the clip plane.
+
 ```bash
-nrrdvis view liver_segmentation.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2
+nrrdvis view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
 ```
 
-```
-wrote liver.html  (7 structures, 118,402 triangles, 1,204 KB)
+Real output, MSD Task03 Liver case `liver_0`:
 
-structure     volume (mL)   max Ø (mm)   surface (cm²)   sphericity   parts
-liver             1587.32        243.1           843.6        0.612       1
-tumour_1            42.18         48.7            72.4        0.881       1
-tumour_2             6.03         24.9            21.8        0.905       1
-...
 ```
+wrote liver.html  (12 structures, 65,532 triangles, 1,569 KB)
+
+structure    volume (mL)  max Ø (mm)  surface (cm²)  sphericity  parts
+liver            1359.65       244.2          940.0       0.631      2
+tumour_1 *          2.68        20.2            9.8       0.952      1
+tumour_2 *          0.89        13.3            4.0       1.000      1
+tumour_3 *          0.81        14.5            4.3       0.972      1
+tumour_4 *          0.39        12.8            2.3       1.000      1
+tumour_5 *          0.36        11.6            2.3       1.000      1
+tumour_6 *          0.34        10.3            1.9       1.000      1
+tumour_7 *          0.33        12.2            2.1       1.000      1
+tumour_8 *          0.24         9.1            2.1       0.882      1
+tumour_9 *          0.13         6.9            1.4       0.868      1
+tumour_10 *         0.11         6.0            1.2       0.952      1
+tumour_11 *         0.11         5.5            1.2       0.923      1
+
+* spans under 5 voxels on its thinnest axis; shape figures are indicative only
+```
+
+Two things in that table are the point of the rewrite. The liver reports
+`parts = 2`, so the segmentation is not one connected region. And every lesion
+is flagged: at this scan's 5 mm slice thickness a 6 mm lesion spans barely more
+than one slice, so its volume and diameter are usable but its shape is not.
+Neither fact is visible from a rendering alone.
 
 ---
 
