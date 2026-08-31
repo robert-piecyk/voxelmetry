@@ -24,20 +24,24 @@ from pathlib import Path
 import numpy as np
 
 from nrrdvis.datasets import MSDDataset
+from nrrdvis.io import load
 from nrrdvis.measure import lesion_burden, measure_components, measure_label
 
 
-def profile_case(args: tuple[str, str, int, int | None, float]) -> dict:
+def profile_case(args: tuple[str, str, int, int | None, float, bool]) -> dict:
     """Measure one case. Returns a record, or an ``error`` key on failure.
 
     Runs in a worker process, so it takes plain arguments and returns plain
     data rather than Volume objects.
     """
-    root, case_id, organ_label, lesion_label, min_lesion_mm3 = args
+    root, case_id, organ_label, lesion_label, min_lesion_mm3, with_intensity = args
     try:
         dataset = MSDDataset(root)
         case = dataset.case(case_id)
-        image, labels = case.load()
+        # The label volume is all the morphometry needs. Decompressing the
+        # matching image as well roughly doubles the I/O for two numbers, so
+        # it is opt-in.
+        labels = load(case.label_path) if case.label_path else None
         if labels is None:
             return {"case_id": case_id, "error": "no label volume"}
 
@@ -50,9 +54,11 @@ def profile_case(args: tuple[str, str, int, int | None, float]) -> dict:
             "extent_mm": list(labels.extent_mm),
             "slice_thickness_mm": labels.spacing[0],
             "organ": organ.as_dict(),
-            "hu_min": float(image.array.min()),
-            "hu_max": float(image.array.max()),
         }
+        if with_intensity:
+            image = load(case.image_path)
+            record["hu_min"] = float(image.array.min())
+            record["hu_max"] = float(image.array.max())
 
         if lesion_label is not None:
             lesions = measure_components(
@@ -63,6 +69,26 @@ def profile_case(args: tuple[str, str, int, int | None, float]) -> dict:
         return record
     except Exception:  # noqa: BLE001 - one bad case must not kill the run
         return {"case_id": case_id, "error": traceback.format_exc(limit=3)}
+
+
+def read_records(path: Path | None) -> list[dict]:
+    """Load records already written to a JSONL file, tolerating a partial line.
+
+    A run killed mid-write can leave the final line truncated; that line is
+    dropped rather than aborting the resume.
+    """
+    if path is None or not path.exists():
+        return []
+    records = []
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return records
 
 
 def summarise(records: list[dict], label_names: dict[int, str]) -> str:
@@ -158,29 +184,58 @@ def main(argv: list[str] | None = None) -> int:
                         help="Ignore lesion components below this volume.")
     parser.add_argument("--workers", type=int, default=8, help="Parallel worker processes.")
     parser.add_argument("--limit", type=int, default=None, help="Measure only the first N cases.")
-    parser.add_argument("--out", type=Path, default=None, help="Write per-case JSON here.")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="Stream per-case records to this JSONL file, resuming if it exists.")
+    parser.add_argument("--with-intensity", action="store_true",
+                        help="Also load the image volume to record its HU range (slower).")
+    parser.add_argument("--summarize-only", action="store_true",
+                        help="Summarise an existing --out file without measuring anything.")
     args = parser.parse_args(argv)
 
     dataset = MSDDataset(args.root)
     cases = dataset.cases[: args.limit]
     print(f"{dataset.name}: {len(cases)} cases, labels {dataset.label_names}", file=sys.stderr)
 
-    payloads = [
-        (str(args.root), c.case_id, args.organ, args.lesion, args.min_lesion_mm3) for c in cases
-    ]
-    records: list[dict] = []
-    with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        futures = {pool.submit(profile_case, p): p[1] for p in payloads}
-        for done, future in enumerate(as_completed(futures), start=1):
-            records.append(future.result())
-            print(f"\r  {done}/{len(futures)}", end="", file=sys.stderr, flush=True)
-    print(file=sys.stderr)
+    # Results stream to JSONL as they land. A run over 131 large volumes takes
+    # long enough that losing everything to an interrupted process is a real
+    # cost, and an already-measured case never needs measuring twice.
+    records = read_records(args.out) if args.out else []
+    done_ids = {r["case_id"] for r in records if "error" not in r}
+    if done_ids:
+        print(f"resuming: {len(done_ids)} already measured", file=sys.stderr)
+
+    todo = [c for c in cases if c.case_id not in done_ids]
+    if args.summarize_only:
+        todo = []
+
+    if todo:
+        payloads = [
+            (str(args.root), c.case_id, args.organ, args.lesion,
+             args.min_lesion_mm3, args.with_intensity)
+            for c in todo
+        ]
+        handle = None
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            handle = args.out.open("a")
+        try:
+            with ProcessPoolExecutor(max_workers=args.workers) as pool:
+                futures = {pool.submit(profile_case, p): p[1] for p in payloads}
+                for done, future in enumerate(as_completed(futures), start=1):
+                    record = future.result()
+                    records.append(record)
+                    if handle:
+                        handle.write(json.dumps(record) + "\n")
+                        handle.flush()
+                    print(f"\r  {done}/{len(futures)}", end="", file=sys.stderr, flush=True)
+        finally:
+            if handle:
+                handle.close()
+        print(file=sys.stderr)
 
     records.sort(key=lambda r: r["case_id"])
     if args.out:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(json.dumps(records, indent=2))
-        print(f"wrote {args.out}", file=sys.stderr)
+        print(f"{len(records)} records in {args.out}", file=sys.stderr)
 
     print()
     print(summarise(records, dataset.label_names))
