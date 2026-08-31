@@ -166,3 +166,35 @@ def test_table_flags_resolution_limited_rows():
     array[9:11, 9:11, 9:11] = 1
     text = nm.to_table([nm.measure_label(Volume(array, spacing=(5.0, 1.0, 1.0)), 1)])
     assert "*" in text and "thinnest axis" in text
+
+
+@pytest.mark.parametrize("block", [16, 128, 100_000])
+def test_feret_diameter_is_independent_of_block_size(block):
+    """Blocking exists to bound memory; it must not change the answer.
+
+    An earlier version subsampled large hulls, which can only ever report a
+    diameter that is too small. This pins the exactness.
+    """
+    rng = np.random.default_rng(3)
+    array = np.zeros((50, 50, 50), dtype=np.uint8)
+    coords = rng.integers(2, 48, size=(400, 3))
+    array[coords[:, 0], coords[:, 1], coords[:, 2]] = 1
+    mask = array == 1
+
+    reference = nm.max_diameter_mm(mask, (1.0, 1.0, 1.0), block=100_000)
+    assert nm.max_diameter_mm(mask, (1.0, 1.0, 1.0), block=block) == pytest.approx(reference)
+
+
+def test_feret_diameter_uses_physical_spacing():
+    """Two voxels 10 apart on a 3 mm axis are 30 mm apart, not 10."""
+    array = np.zeros((14, 5, 5), dtype=np.uint8)
+    array[1, 2, 2] = 1
+    array[11, 2, 2] = 1
+    measured = nm.max_diameter_mm(array == 1, (3.0, 1.0, 1.0))
+    assert measured == pytest.approx(30.0)
+
+
+def test_single_voxel_has_no_diameter():
+    array = np.zeros((10, 10, 10), dtype=np.uint8)
+    array[5, 5, 5] = 1
+    assert nm.max_diameter_mm(array == 1, (1.0, 1.0, 1.0)) == 0.0

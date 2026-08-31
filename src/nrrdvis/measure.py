@@ -201,23 +201,40 @@ def surface_area_mm2(
     return float(skmeasure.mesh_surface_area(verts, faces))
 
 
-def max_diameter_mm(mask: np.ndarray, spacing: tuple[float, float, float]) -> float:
+def max_diameter_mm(
+    mask: np.ndarray,
+    spacing: tuple[float, float, float],
+    block: int = 2048,
+) -> float:
     """Largest straight-line distance between any two voxels in the mask.
 
     This is the true 3-D Feret diameter. v1 approximated it by picking the
     axial slice with the most foreground pixels and taking that slice's index
-    span, which both ignores oblique extent and misses the z direction.
+    span, which ignores oblique extent and cannot see the z direction at all.
 
-    The computation runs over the convex hull of the surface points, so cost
-    depends on the hull size rather than on the voxel count.
+    Both endpoints of the longest chord necessarily lie on the convex hull, so
+    the hull is computed first and the exact maximum taken over its vertices.
+    The pairwise distances are evaluated in blocks rather than as one matrix:
+    a liver hull can carry several thousand vertices, and materialising the
+    full matrix for those would cost hundreds of megabytes. Blocking keeps
+    peak memory at ``block x n`` while still producing the exact answer, which
+    subsampling the hull would not.
+
+    Args:
+        mask: Boolean array of the structure.
+        spacing: Millimetres per voxel, ``(z, y, x)``.
+        block: Rows evaluated per iteration; trades memory against call count.
+
+    Returns:
+        The diameter in millimetres, or 0.0 for an empty or single-voxel mask.
     """
     if not mask.any():
         return 0.0
 
-    # Surface voxels only: interior points can never be a diameter endpoint.
+    # Surface voxels only: an interior point can never be a chord endpoint.
     eroded = ndimage.binary_erosion(mask, ndimage.generate_binary_structure(3, 1))
     surface = mask & ~eroded
-    points = np.argwhere(surface if surface.any() else mask).astype(float)
+    points = np.argwhere(surface if surface.any() else mask).astype(np.float64)
     points *= np.asarray(spacing, dtype=float)
 
     if len(points) < 2:
@@ -228,18 +245,17 @@ def max_diameter_mm(mask: np.ndarray, spacing: tuple[float, float, float]) -> fl
             from scipy.spatial import ConvexHull
 
             points = points[ConvexHull(points).vertices]
-        except Exception:  # noqa: BLE001 - degenerate (coplanar) hulls
+        except Exception:  # noqa: BLE001 - degenerate (coplanar) point sets
             pass
 
-    if len(points) > 3000:
-        # Guard against pathological hulls; the sample keeps this exact enough
-        # for reporting while bounding the pairwise-distance cost.
-        rng = np.random.default_rng(0)
-        points = points[rng.choice(len(points), 3000, replace=False)]
+    squared_max = 0.0
+    for start in range(0, len(points), block):
+        chunk = points[start : start + block]
+        # (chunk, 1, 3) against (1, n, 3) broadcasts to one block of distances.
+        deltas = chunk[:, None, :] - points[None, :, :]
+        squared_max = max(squared_max, float(np.einsum("ijk,ijk->ij", deltas, deltas).max()))
 
-    from scipy.spatial.distance import pdist
-
-    return float(pdist(points).max())
+    return float(np.sqrt(squared_max))
 
 
 def to_table(measurements: list[LabelMeasurement]) -> str:
