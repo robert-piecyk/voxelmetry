@@ -173,15 +173,23 @@ def _add_component_meshes(
 
     # Small structures need a proportionally smaller face budget, or three
     # lesions cost as much as the organ containing them.
+    # Same cropping as measure_components, and for the same reason: extracting
+    # a lesion surface from the full grid costs seconds per lesion. The crop
+    # carries a corrected origin, so meshes still land in patient coordinates.
+    margin_mm = 2.0 * max(labelmap.spacing)
+
     for rank, component_id in enumerate(order, start=1):
         if sizes[component_id] == 0 or sizes[component_id] < min_voxels:
             continue
         if rank > len(components):
             break
         budget = max(int(max_faces * sizes[component_id] / max(sizes.max(), 1)), 500)
+        component_mask = labelled == component_id
+        cropped = labelmap.with_array(component_mask.astype(np.uint8)).crop_to_mask(
+            component_mask, margin_mm=margin_mm
+        )
         mesh = surface_from_label(
-            labelmap.with_array((labelled == component_id).astype(np.uint8)),
-            1, name=f"{components[rank - 1].name}", color=color,
+            cropped, 1, name=f"{components[rank - 1].name}", color=color,
         )
         mesh = smooth(decimate(mesh, budget), smooth_iterations)
         mesh.metadata = components[rank - 1].as_dict()

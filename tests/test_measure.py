@@ -252,3 +252,51 @@ def test_largest_component_fraction_reports_the_stray_share():
     assert m.largest_component_fraction == pytest.approx(1000 / 1001)
     stray = m.volume_mm3 * (1 - m.largest_component_fraction)
     assert stray == pytest.approx(1.0, abs=0.01)
+
+
+def test_component_measurements_are_unchanged_by_the_bounding_box_crop():
+    """Components are measured inside their own box for speed, not different results.
+
+    Centroids in particular must stay in patient coordinates: the crop shifts
+    the origin, and forgetting that shift would silently report crop-local
+    positions.
+    """
+    from nrrdvis.phantom import sphere_mask
+
+    spacing = (2.5, 1.0, 1.0)
+    shape = (60, 80, 80)
+    array = np.zeros(shape, dtype=np.uint8)
+    centres = [(15, 20, 20), (40, 60, 55)]
+    for centre in centres:
+        array[sphere_mask(shape, centre, 6.0, spacing)] = 1
+    labelmap = Volume(array, spacing=spacing, origin=(100.0, -50.0, 25.0))
+
+    components = nm.measure_components(labelmap, 1, "blob")
+    assert len(components) == 2
+
+    for measured in components:
+        # Match each result back to the sphere centre it came from.
+        expected = min(
+            (np.array(c) * np.array(spacing) + np.array(labelmap.origin) for c in centres),
+            key=lambda e: np.linalg.norm(e - np.array(measured.centroid_mm)),
+        )
+        assert np.allclose(measured.centroid_mm, expected, atol=1.0)
+        # And the geometry itself is the sphere's, not the crop's.
+        assert measured.max_diameter_mm == pytest.approx(12.0, abs=2.0)
+        assert measured.sphericity == pytest.approx(1.0, abs=0.12)
+
+
+def test_cropping_matches_whole_volume_measurement():
+    """A single component measured cropped equals the same label measured whole."""
+    array = np.zeros((40, 40, 40), dtype=np.uint8)
+    array[10:20, 12:22, 14:24] = 1
+    labelmap = Volume(array, spacing=(2.0, 1.0, 1.5), origin=(5.0, 7.0, 9.0))
+
+    whole = nm.measure_label(labelmap, 1)
+    cropped = nm.measure_components(labelmap, 1)[0]
+
+    assert cropped.volume_mm3 == pytest.approx(whole.volume_mm3)
+    assert cropped.surface_area_mm2 == pytest.approx(whole.surface_area_mm2, rel=1e-6)
+    assert cropped.max_diameter_mm == pytest.approx(whole.max_diameter_mm)
+    assert np.allclose(cropped.centroid_mm, whole.centroid_mm)
+    assert cropped.bbox_mm == pytest.approx(whole.bbox_mm)

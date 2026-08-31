@@ -331,12 +331,39 @@ def measure_components(
     order = np.argsort(sizes)[::-1]
     min_voxels = min_volume_mm3 / labelmap.voxel_volume_mm3
 
+    # Every component is measured inside its own bounding box. Measured on the
+    # full grid instead, a 1 mL lesion in a 165-million-voxel study costs about
+    # ten seconds -- marching cubes, erosion and the component pass all sweep
+    # the entire array for a structure occupying a thousandth of a percent of
+    # it. find_objects hands back every bounding box in one pass, so the work
+    # per component becomes proportional to the component.
+    boxes = ndimage.find_objects(components)
+    pad = [max(int(round(2.0 * max(labelmap.spacing) / s)), 1) for s in labelmap.spacing]
+    origin = np.asarray(labelmap.origin, dtype=float)
+    spacing = np.asarray(labelmap.spacing, dtype=float)
+
     results = []
     for rank, component_id in enumerate(order, start=1):
         if sizes[component_id] == 0 or sizes[component_id] < min_voxels:
             continue
-        isolated = labelmap.with_array(
-            np.where(components == component_id, label, 0).astype(labelmap.array.dtype)
+        box = boxes[component_id - 1]
+        if box is None:  # pragma: no cover - only if labelling skipped an id
+            continue
+
+        window = tuple(
+            slice(max(axis.start - pad[a], 0), min(axis.stop + pad[a], components.shape[a]))
+            for a, axis in enumerate(box)
+        )
+        sub = components[window] == component_id
+        # The origin shifts by however much was trimmed, so the centroid stays
+        # in patient coordinates rather than in crop-local ones.
+        sub_origin = origin + np.array([w.start for w in window], dtype=float) * spacing
+
+        isolated = Volume(
+            np.where(sub, label, 0).astype(labelmap.array.dtype),
+            spacing=labelmap.spacing,
+            origin=tuple(sub_origin),
+            name=f"{display_name}_{rank}",
         )
         results.append(measure_label(isolated, label, f"{display_name}_{rank}"))
     return results
