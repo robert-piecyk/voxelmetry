@@ -18,3 +18,4 @@ outputs/
 *.dcm
 *.tar
 temp-plot.html
+tests/js/node_modules

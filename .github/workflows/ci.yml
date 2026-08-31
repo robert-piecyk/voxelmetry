@@ -24,6 +24,14 @@ jobs:
       - name: Install
         run: pip install -e ".[all]"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install viewer test harness
+        working-directory: tests/js
+        run: npm install --no-audit --no-fund
+
       - name: Lint
         run: ruff check src tests
 
