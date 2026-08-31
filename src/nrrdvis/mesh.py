@@ -82,6 +82,65 @@ class Mesh:
         return f"Mesh({self.name!r}, {self.n_vertices} verts, {self.n_faces} faces)"
 
 
+def isosurface(
+    mask: np.ndarray,
+    spacing: tuple[float, float, float],
+    sigma: float = 1.0,
+    step_size: int = 1,
+    level: float = 0.5,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Triangulate a binary mask, degrading gracefully when smoothing erases it.
+
+    Pre-smoothing removes the marching-cubes staircase, but a structure only
+    one voxel thick on some axis has its peak intensity pulled below ``level``
+    by that same blur, and the isosurface then comes back empty. At 5 mm slice
+    thickness a lesion confined to a single slice is routine, so this is not an
+    edge case: it would silently report zero surface area and no geometry for
+    exactly the small lesions a reader cares about.
+
+    When the smoothed pass yields nothing, this falls back to the unsmoothed
+    mask. That result carries the staircase overestimate, but an approximate
+    surface is strictly better than a false zero, and the caller can tell the
+    difference from the returned sigma.
+
+    Args:
+        mask: Boolean array of the structure, indexed ``[z, y, x]``.
+        spacing: Millimetres per voxel, ``(z, y, x)``.
+        sigma: Preferred pre-smoothing width in voxels; 0 disables smoothing.
+        step_size: Marching-cubes stride.
+        level: Isolevel to trace.
+
+    Returns:
+        ``(vertices, faces, sigma_used)`` in padded voxel-millimetre
+        coordinates. ``sigma_used`` is 0.0 when the fallback was taken, and
+        the arrays are empty when even that finds no surface.
+    """
+    from skimage import measure as skmeasure
+
+    empty = (np.zeros((0, 3), np.float64), np.zeros((0, 3), np.int64), 0.0)
+    if not mask.any():
+        return empty
+
+    padded = np.pad(mask.astype(np.float32), 2, mode="constant", constant_values=0)
+
+    for attempt in ([sigma, 0.0] if sigma > 0 else [0.0]):
+        data = ndimage.gaussian_filter(padded, attempt) if attempt > 0 else padded
+        # Cheaper than catching the exception, and states the condition.
+        if data.max() <= level:
+            continue
+        try:
+            verts, faces, _, _ = skmeasure.marching_cubes(
+                data, level=level, spacing=spacing, step_size=step_size,
+                allow_degenerate=False,
+            )
+        except (RuntimeError, ValueError):  # pragma: no cover - degenerate masks
+            continue
+        if len(faces):
+            return verts, faces, attempt
+
+    return empty
+
+
 def extract_surface(
     mask: np.ndarray,
     spacing: tuple[float, float, float],
@@ -108,20 +167,8 @@ def extract_surface(
         A :class:`Mesh` with vertices in ``(x, y, z)`` millimetres. An empty
         mask yields an empty mesh rather than raising.
     """
-    from skimage import measure as skmeasure
-
-    if not mask.any():
-        return Mesh(np.zeros((0, 3), np.float32), np.zeros((0, 3), np.uint32), name, color)
-
-    padded = np.pad(mask.astype(np.float32), 2, mode="constant", constant_values=0)
-    if smoothing_sigma > 0:
-        padded = ndimage.gaussian_filter(padded, smoothing_sigma)
-
-    try:
-        verts, faces, _, _ = skmeasure.marching_cubes(
-            padded, level=0.5, spacing=spacing, step_size=step_size, allow_degenerate=False
-        )
-    except (RuntimeError, ValueError):  # pragma: no cover - degenerate masks
+    verts, faces, _ = isosurface(mask, spacing, smoothing_sigma, step_size)
+    if not len(faces):
         return Mesh(np.zeros((0, 3), np.float32), np.zeros((0, 3), np.uint32), name, color)
 
     # Undo the 2-voxel pad, then shift into patient coordinates.

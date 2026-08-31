@@ -129,3 +129,30 @@ def test_cluster_fallback_keeps_the_shape_recognisable(sphere):
     assert nmesh.mesh_volume_mm3(reduced) == pytest.approx(
         analytic_sphere_volume_mm3(30.0), rel=0.05
     )
+
+
+def test_thin_structure_still_produces_geometry():
+    """Without the unsmoothed fallback the viewer would render nothing here."""
+    mask = np.zeros((20, 40, 40), dtype=bool)
+    mask[10, 15:25, 15:25] = True
+    mesh = nmesh.extract_surface(mask, spacing=(5.0, 0.7, 0.7), name="flat")
+    assert mesh.n_faces > 0 and mesh.n_vertices > 0
+
+
+def test_isosurface_reports_which_sigma_it_used():
+    """The caller can tell a smoothed result from a fallback one."""
+    thick = np.zeros((30, 30, 30), dtype=bool)
+    thick[10:20, 10:20, 10:20] = True
+    _, _, used = nmesh.isosurface(thick, (1.0, 1.0, 1.0), sigma=0.8)
+    assert used == pytest.approx(0.8)
+
+    thin = np.zeros((20, 40, 40), dtype=bool)
+    thin[10, 15:25, 15:25] = True
+    _, faces, used_thin = nmesh.isosurface(thin, (5.0, 0.7, 0.7), sigma=0.8)
+    assert len(faces) > 0
+    assert used_thin == 0.0  # fell back
+
+
+def test_isosurface_of_an_empty_mask_is_empty():
+    verts, faces, used = nmesh.isosurface(np.zeros((10, 10, 10), dtype=bool), (1.0, 1.0, 1.0))
+    assert len(verts) == 0 and len(faces) == 0 and used == 0.0

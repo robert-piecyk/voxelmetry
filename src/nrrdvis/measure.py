@@ -186,17 +186,14 @@ def surface_area_mm2(
     """
     from skimage import measure as skmeasure
 
-    if not mask.any():
-        return 0.0
-    # Pad so structures touching the border still produce a closed surface.
-    padded = np.pad(mask.astype(np.float32), 2, mode="constant", constant_values=0)
-    if sigma > 0:
-        # Sigma is in voxels on every axis: the staircase being corrected is an
-        # artifact of the sampling grid, not of physical distance.
-        padded = ndimage.gaussian_filter(padded, sigma)
-    try:
-        verts, faces, _, _ = skmeasure.marching_cubes(padded, level=0.5, spacing=spacing)
-    except (RuntimeError, ValueError):  # pragma: no cover - degenerate masks
+    from .mesh import isosurface
+
+    # Sigma is in voxels on every axis: the staircase being corrected is an
+    # artifact of the sampling grid, not of physical distance. isosurface()
+    # falls back to the unsmoothed mask for structures too thin to survive the
+    # blur, so a one-slice lesion reports an approximate area rather than zero.
+    verts, faces, _ = isosurface(mask, spacing, sigma)
+    if not len(faces):
         return 0.0
     return float(skmeasure.mesh_surface_area(verts, faces))
 

@@ -198,3 +198,32 @@ def test_single_voxel_has_no_diameter():
     array = np.zeros((10, 10, 10), dtype=np.uint8)
     array[5, 5, 5] = 1
     assert nm.max_diameter_mm(array == 1, (1.0, 1.0, 1.0)) == 0.0
+
+
+def test_single_slice_lesion_reports_a_real_surface_area():
+    """A lesion confined to one slice must not report zero area.
+
+    At 5 mm slice thickness this is routine, not an edge case. The 0.8-voxel
+    pre-smooth pulls such a structure's peak below the 0.5 isolevel and the
+    isosurface comes back empty; the fallback to an unsmoothed pass is what
+    keeps the number finite.
+    """
+    array = np.zeros((20, 40, 40), dtype=np.uint8)
+    array[10, 15:25, 15:25] = 1  # one slice thick
+    labelmap = Volume(array, spacing=(5.0, 0.7, 0.7))
+
+    m = nm.measure_label(labelmap, 1, "flat_lesion")
+    assert m.volume_mm3 > 0
+    assert m.surface_area_mm2 > 0
+    assert 0 < m.sphericity <= 1.0
+    assert m.resolution_limited  # and it is still flagged as unreliable
+
+
+def test_smoothing_erases_a_single_slice_structure_without_the_fallback():
+    """Pin the failure the fallback exists to prevent."""
+    from scipy import ndimage as ndi
+
+    array = np.zeros((20, 40, 40), dtype=np.uint8)
+    array[10, 15:25, 15:25] = 1
+    padded = np.pad((array == 1).astype(np.float32), 2)
+    assert ndi.gaussian_filter(padded, 0.8).max() <= 0.5
