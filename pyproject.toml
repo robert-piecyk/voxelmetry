@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nrrdvis"
+version = "2.0.0"
+description = "Spacing-aware 3D medical volume processing, morphometry and a self-contained web viewer."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Robert Piecyk" }]
+keywords = ["medical-imaging", "ct", "segmentation", "visualization", "nrrd", "dicom"]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-image>=0.22",
+    "SimpleITK>=2.3",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dicom = ["pydicom>=2.4"]
+mesh = ["trimesh>=4.0"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
+all = ["nrrdvis[dicom,mesh,dev]"]
+
+[project.scripts]
+nrrdvis = "nrrdvis.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# typer's entire API is function calls in argument defaults; B008 is wrong here.
+"src/nrrdvis/cli.py" = ["B008"]
+# The viewer template is a JS/CSS blob whose line lengths are not Python's business.
+"src/nrrdvis/viewer/html.py" = ["E501"]
