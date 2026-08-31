@@ -104,3 +104,28 @@ def test_binary_payload_beats_json_numbers_on_size(sphere):
         "vertices": mesh.vertices.tolist(), "faces": mesh.faces.tolist(),
     }))
     assert binary < as_numbers / 2
+
+
+@pytest.mark.parametrize("target", [8000, 2000, 500])
+def test_cluster_fallback_respects_the_budget(sphere, target):
+    """The no-dependency path must work: CI installs may lack the fast backend."""
+    _, labels = sphere
+    mesh = nmesh.surface_from_label(labels, 1)
+    reduced = mesh
+    for attempt in range(6):
+        reduced = nmesh._cluster_decimate(mesh, target, growth=1.35**attempt)
+        if reduced.n_faces <= target:
+            break
+    assert 0 < reduced.n_faces <= target
+
+
+def test_cluster_fallback_keeps_the_shape_recognisable(sphere):
+    """Cruder than quadric decimation, but it must not distort the geometry."""
+    from nrrdvis.phantom import analytic_sphere_volume_mm3
+
+    _, labels = sphere
+    mesh = nmesh.surface_from_label(labels, 1)
+    reduced = nmesh._cluster_decimate(mesh, 4000)
+    assert nmesh.mesh_volume_mm3(reduced) == pytest.approx(
+        analytic_sphere_volume_mm3(30.0), rel=0.05
+    )

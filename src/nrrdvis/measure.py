@@ -315,20 +315,8 @@ def measure_components(
         isolated = labelmap.with_array(
             np.where(components == component_id, label, 0).astype(labelmap.array.dtype)
         )
-        results.append(
-            replace_name(
-                measure_label(isolated, label, f"{display_name}_{rank}"),
-                f"{display_name}_{rank}",
-            )
-        )
+        results.append(measure_label(isolated, label, f"{display_name}_{rank}"))
     return results
-
-
-def replace_name(measurement: LabelMeasurement, name: str) -> LabelMeasurement:
-    """Return ``measurement`` with a different display name."""
-    import dataclasses
-
-    return dataclasses.replace(measurement, name=name)
 
 
 def lesion_burden(
