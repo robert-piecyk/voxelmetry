@@ -227,3 +227,28 @@ def test_smoothing_erases_a_single_slice_structure_without_the_fallback():
     array[10, 15:25, 15:25] = 1
     padded = np.pad((array == 1).astype(np.float32), 2)
     assert ndi.gaussian_filter(padded, 0.8).max() <= 0.5
+
+
+def test_component_count_is_sensitive_to_connectivity():
+    """Two voxels touching only at a corner: two parts by face, one by 26-way.
+
+    This is why n_components alone is not a fragmentation score, and why the
+    cohort report leads with stray volume instead.
+    """
+    array = np.zeros((10, 10, 10), dtype=np.uint8)
+    array[4, 4, 4] = 1
+    array[5, 5, 5] = 1  # diagonal neighbour only
+    volume = Volume(array)
+    assert nm.measure_label(volume, 1, connectivity=1).n_components == 2
+    assert nm.measure_label(volume, 1, connectivity=3).n_components == 1
+
+
+def test_largest_component_fraction_reports_the_stray_share():
+    array = np.zeros((30, 30, 30), dtype=np.uint8)
+    array[5:15, 5:15, 5:15] = 1   # 1000 voxels
+    array[25, 25, 25] = 1         # 1 stray voxel
+    m = nm.measure_label(Volume(array), 1)
+    assert m.n_components == 2
+    assert m.largest_component_fraction == pytest.approx(1000 / 1001)
+    stray = m.volume_mm3 * (1 - m.largest_component_fraction)
+    assert stray == pytest.approx(1.0, abs=0.01)

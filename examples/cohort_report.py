@@ -123,6 +123,19 @@ def summarise(records: list[dict], label_names: dict[int, str]) -> str:
     add(f"organ components      {int(parts.min())} to {int(parts.max())}"
         f"   {len(fragmented)} case(s) not a single connected region")
 
+    # Stray volume is the honest measure. Component counts at face-adjacency
+    # are dominated by single voxels that touch the main body at a corner, so
+    # a label can report hundreds of "parts" for a few hundredths of a percent
+    # of its volume.
+    stray = np.array([
+        r["organ"]["volume_mm3"] * (1.0 - r["organ"]["largest_component_fraction"])
+        for r in good
+    ])
+    add(f"  stray volume (mm3)  {stray.min():.1f} to {stray.max():.1f}"
+        f"   median {np.median(stray):.1f}"
+        f"   worst {100 * (stray / np.array([r['organ']['volume_mm3'] for r in good])).max():.3f}%"
+        " of its organ")
+
     if any("burden" in r for r in good):
         with_lesions = [r for r in good if r.get("burden", {}).get("n_lesions", 0) > 0]
         add("")
@@ -154,7 +167,8 @@ def summarise(records: list[dict], label_names: dict[int, str]) -> str:
 
     if fragmented:
         add("")
-        add("organ segmented as more than one region:")
+        add("organ segmented as more than one region"
+            " (components at face-adjacency; 26-adjacency gives far fewer):")
         for record in sorted(fragmented, key=lambda r: -r["organ"]["n_components"])[:8]:
             organ = record["organ"]
             # The stray volume is the informative number: a fraction that

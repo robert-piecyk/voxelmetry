@@ -53,8 +53,18 @@ def measure_label(
         labelmap: Integer-valued :class:`Volume` holding the segmentation.
         label: The value to measure.
         name: Human-readable name for the structure.
-        connectivity: 1 for face-adjacency, 3 for full 26-neighbourhood, when
-            counting connected components.
+        connectivity: 1 for face-adjacency, 3 for the full 26-neighbourhood,
+            when counting connected components.
+
+    Note:
+        ``n_components`` is strongly sensitive to ``connectivity`` and should
+        not be read as a fragmentation score on its own. A ragged annotation
+        boundary leaves single voxels touching the main body only at a corner:
+        face-adjacency counts each as its own component, 26-adjacency absorbs
+        them. One real liver label in MSD Task03 reports 395 components at
+        connectivity 1 and 27 at connectivity 3, for 0.04% of its volume.
+        ``largest_component_fraction`` -- or the stray volume derived from it
+        -- is the figure that means something.
 
     Returns:
         A :class:`LabelMeasurement`. Empty labels yield an all-zero record
