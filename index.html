@@ -1,0 +1,541 @@
+<title>voxelmetry Field Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,600&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#eceef0; --panel:#fafbfc; --sunk:#e4e8ec;
+    --ink:#181c20; --muted:#5f6a73; --faint:#8b959d;
+    --line:#d8dde2; --line-soft:#e6eaee;
+    --accent:#2f6f9f; --accent-soft:#e6eff6; --accent-ink:#ffffff;
+    --warn:#8a6a1f; --warn-bg:#f6efdb; --warn-line:#e0d0a0;
+    --clay:#b04a31; --clay-bg:#f8ebe7; --clay-line:#e8cabf;
+    --good:#456f45; --good-bg:#e8f0e6;
+    --code-ink:#22282d; --term-bg:#1b1f24; --term-ink:#d6dbe0;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#101317; --panel:#181c21; --sunk:#14181c;
+      --ink:#e6e9ec; --muted:#98a2ab; --faint:#727d86;
+      --line:#2b3138; --line-soft:#232930;
+      --accent:#7fb2dc; --accent-soft:#17242e; --accent-ink:#0e1216;
+      --warn:#d9bd72; --warn-bg:#241f12; --warn-line:#453a1e;
+      --clay:#d9836a; --clay-bg:#241713; --clay-line:#452720;
+      --good:#8fb98c; --good-bg:#16201a;
+      --code-ink:#d4dae0; --term-bg:#0b0d10; --term-ink:#ccd3d9;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#101317; --panel:#181c21; --sunk:#14181c;
+    --ink:#e6e9ec; --muted:#98a2ab; --faint:#727d86;
+    --line:#2b3138; --line-soft:#232930;
+    --accent:#7fb2dc; --accent-soft:#17242e; --accent-ink:#0e1216;
+    --warn:#d9bd72; --warn-bg:#241f12; --warn-line:#453a1e;
+    --clay:#d9836a; --clay-bg:#241713; --clay-line:#452720;
+    --good:#8fb98c; --good-bg:#16201a;
+    --code-ink:#d4dae0; --term-bg:#0b0d10; --term-ink:#ccd3d9;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:400 16px/1.65 "IBM Plex Sans",ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent); color:var(--accent-ink)}
+
+  #shell{display:grid; grid-template-columns:238px minmax(0,1fr); gap:0; max-width:1180px; margin:0 auto}
+  #rail{position:sticky; top:0; align-self:start; height:100vh; height:100dvh; overflow-y:auto;
+    padding:38px 20px 38px 24px; border-right:1px solid var(--line)}
+  main{padding:38px 40px 96px; min-width:0}
+
+  /* --- rail --- */
+  .brand{font-family:Literata,Georgia,serif; font-weight:600; font-size:17px; letter-spacing:-.01em}
+  .brandsub{color:var(--muted); font-size:12px; margin-top:2px; margin-bottom:20px}
+  #rail ol{list-style:none; margin:0; padding:0; counter-reset:s}
+  #rail li{margin:0 0 1px}
+  #rail a{display:flex; gap:9px; padding:5px 8px; margin-left:-8px; border-radius:6px;
+    color:var(--muted); text-decoration:none; font-size:13.5px; line-height:1.35}
+  #rail a:hover{background:var(--sunk); color:var(--ink)}
+  #rail a.on{color:var(--accent); font-weight:500}
+  #rail a .n{color:var(--faint); font-variant-numeric:tabular-nums; flex:none; font-size:12px; padding-top:1px}
+  #rail a.on .n{color:var(--accent)}
+
+  /* --- type --- */
+  h1{font-family:Literata,Georgia,serif; font-weight:600; font-size:40px; line-height:1.12;
+    letter-spacing:-.022em; margin:0 0 12px; text-wrap:balance}
+  .lede{font-size:18.5px; line-height:1.6; color:var(--muted); max-width:64ch; margin:0 0 26px}
+  h2{font-family:Literata,Georgia,serif; font-weight:600; font-size:25px; letter-spacing:-.016em;
+    margin:56px 0 12px; scroll-margin-top:26px; text-wrap:balance;
+    padding-top:22px; border-top:1px solid var(--line)}
+  h2 .n{color:var(--faint); font-variant-numeric:tabular-nums; margin-right:11px; font-weight:500}
+  h3{font-size:15px; font-weight:600; margin:30px 0 8px; letter-spacing:-.005em}
+  p{margin:0 0 14px; max-width:68ch}
+  a{color:var(--accent)}
+  strong{font-weight:600}
+  em{font-style:italic; color:var(--muted)}
+  ul,ol.body{margin:0 0 14px; padding-left:22px; max-width:66ch}
+  li{margin:0 0 6px}
+  hr{border:none; border-top:1px solid var(--line); margin:40px 0}
+
+  code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:.875em; background:var(--sunk); padding:1.5px 5px; border-radius:4px;
+    color:var(--code-ink); border:1px solid var(--line-soft)}
+
+  /* --- code + terminal blocks --- */
+  .block{margin:0 0 18px; border-radius:9px; overflow:hidden; border:1px solid var(--line)}
+  .block .bar{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:6px 10px 6px 13px; background:var(--panel); border-bottom:1px solid var(--line);
+    font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--faint); font-weight:600}
+  .block pre{margin:0; padding:14px 15px; overflow-x:auto; background:var(--panel);
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:13.5px; line-height:1.6;
+    color:var(--code-ink)}
+  .block.out pre{background:var(--term-bg); color:var(--term-ink)}
+  .block.out .bar{background:var(--term-bg); color:#7e8a94; border-bottom:1px solid #2a3138}
+  .copy{font:inherit; font-size:11px; letter-spacing:.05em; text-transform:uppercase; font-weight:600;
+    background:transparent; border:1px solid var(--line); color:var(--faint);
+    padding:2px 8px; border-radius:5px; cursor:pointer}
+  .copy:hover{color:var(--accent); border-color:var(--accent)}
+  .block.out .copy{border-color:#2f373e}
+  .block.out .copy:hover{color:#9ec5e2; border-color:#9ec5e2}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+
+  /* --- callouts --- */
+  .note{border-left:3px solid var(--accent); background:var(--accent-soft);
+    padding:13px 16px; border-radius:0 8px 8px 0; margin:0 0 18px; max-width:68ch}
+  .note p:last-child{margin-bottom:0}
+  .trap{border:1px solid var(--warn-line); background:var(--warn-bg);
+    padding:14px 17px; border-radius:9px; margin:0 0 18px; max-width:70ch}
+  .trap p:last-child{margin-bottom:0}
+  .tag{display:inline-block; font-size:10.5px; font-weight:600; letter-spacing:.08em;
+    text-transform:uppercase; padding:1px 7px; border-radius:4px; vertical-align:2px; margin-right:8px}
+  .tag.t{background:var(--warn); color:var(--warn-bg)}
+  .tag.v1{background:var(--clay); color:var(--clay-bg)}
+  .was{border-left:3px solid var(--clay); background:var(--clay-bg);
+    padding:12px 16px; border-radius:0 8px 8px 0; margin:0 0 18px; max-width:68ch; font-size:15px}
+  .was p:last-child{margin-bottom:0}
+
+  /* --- tables --- */
+  .scroll{overflow-x:auto; margin:0 0 20px; border:1px solid var(--line); border-radius:9px}
+  table{border-collapse:collapse; width:100%; font-size:14px}
+  th{text-align:left; font-weight:600; font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--faint); padding:9px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+    white-space:nowrap}
+  td{padding:9px 14px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .num{font-variant-numeric:tabular-nums; text-align:right}
+
+  figure{margin:0 0 20px}
+  figure img{width:100%; border-radius:9px; border:1px solid var(--line); display:block}
+  figcaption{color:var(--muted); font-size:13.5px; margin-top:9px; max-width:70ch}
+
+  .pill{display:inline-block; font-size:12px; padding:2px 9px; border-radius:20px;
+    border:1px solid var(--line); color:var(--muted); margin:0 6px 6px 0}
+  .pill b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums}
+
+  footer{margin-top:56px; padding-top:22px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:13.5px}
+
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+  @media (max-width:900px){
+    #shell{grid-template-columns:1fr}
+    #rail{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line);
+      padding:24px 22px 16px}
+    #rail ol{columns:2; column-gap:18px}
+    main{padding:26px 22px 72px}
+    h1{font-size:31px}
+    h2{font-size:22px; margin-top:44px}
+  }
+</style>
+
+<div id="shell">
+<nav id="rail" aria-label="Contents">
+  <div class="brand">voxelmetry</div>
+  <div class="brandsub">Field guide, v2.0</div>
+  <ol id="toc"></ol>
+</nav>
+
+<main>
+<h1>Reading, measuring and viewing medical volumes</h1>
+<p class="lede">Working guide to <code>voxelmetry</code>: reading volumes, measuring structures in
+millimetres and litres, and turning a segmentation into a 3-D viewer. All output shown is from real
+runs.</p>
+
+<div>
+  <span class="pill"><b>Python</b> 3.10+</span>
+  <span class="pill">CT &amp; MR</span>
+  <span class="pill">DICOM · NIfTI · NRRD · DICOM SEG</span>
+  <span class="pill"><b>164</b> tests</span>
+</div>
+
+<h2 id="s0"><span class="n">00</span>Quick check</h2>
+<p>The demo builds a synthetic torso, measures every structure and writes a viewer. No data
+required.</p>
+
+<div class="block"><div class="bar"><span>shell</span></div><pre>pip install -e ".[all]"
+voxelmetry demo -o demo.html</pre></div>
+
+<div class="block out"><div class="bar"><span>output</span></div><pre>wrote demo.html (902 KB)
+
+structure   volume (mL)  max Ø (mm)  surface (cm²)  sphericity  parts
+organ            486.05       141.3          331.0       0.903      1
+lesion_1           2.24        16.1            7.8       1.000      1
+lesion_2           0.59        10.4            2.8       1.000      1
+lesion_3 *         0.35         8.4            1.8       1.000      1
+bone              30.58       145.3           67.0       0.706      3
+
+* spans under 5 voxels on its thinnest axis; shape figures are indicative only</pre></div>
+
+<p>Open <code>demo.html</code> in a browser. The footnote marks <code>lesion_3</code> as too thin on
+its short axis for its shape figures to mean much; its volume and diameter are unaffected.</p>
+
+<h2 id="s1"><span class="n">01</span>Volumes carry their spacing</h2>
+<p>A volume is voxels plus the millimetres-per-voxel needed to interpret them. Held in separate
+variables, the first resize invalidates every measurement taken afterwards.</p>
+
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.phantom import torso_phantom
+
+image, labels = torso_phantom()
+print(image)
+print("voxel volume:", image.voxel_volume_mm3, "mm³")
+
+smaller = image.resample(1.0)          # to 1 mm isotropic
+print(smaller.shape, smaller.extent_mm)</pre></div>
+
+<div class="block out"><div class="bar"><span>output</span></div><pre>Volume('torso_phantom', shape=(96, 128, 128), spacing=2.5x1.5x1.5 mm, extent=240x192x192 mm)
+voxel volume: 5.625 mm³
+(240, 192, 192) (240.0, 192.0, 192.0)</pre></div>
+
+<p>The grid changed from 96×128×128 to 240×192×192; the physical extent did not, and is still
+240×192×192 mm. Axes are <code>(z, y, x)</code> throughout, matching how a DICOM series arrives and
+what marching cubes expects.</p>
+
+<div class="was"><span class="tag v1">v1</span>The original code held voxels in a NumPy array and
+millimetres in a <code>pydicom</code> dataset, then called <code>cv2.resize(img, (256, 256))</code>.
+The array changed shape; the spacing did not. Every measurement after that point was wrong by
+whatever factor the resize applied.</div>
+
+<h2 id="s2"><span class="n">02</span>Loading data</h2>
+<p>One function reads everything. Point it at a file or at a directory of DICOM slices.</p>
+
+<div class="block"><div class="bar"><span>python</span></div><pre>import voxelmetry
+
+vol = voxelmetry.load("scan.nii.gz")        # NIfTI, NRRD, MetaImage
+ct  = voxelmetry.load("dicom_directory/")   # a DICOM series
+voxelmetry.save(vol, "out.nrrd")            # format from the extension</pre></div>
+
+<div class="scroll"><table>
+<tr><th>Input</th><th>How</th><th>Notes</th></tr>
+<tr><td>NIfTI, NRRD, MetaImage</td><td><code>load(path)</code></td><td>Single files, via SimpleITK</td></tr>
+<tr><td>DICOM series</td><td><code>load(directory)</code></td><td>Ordered by <code>ImagePositionPatient</code>, never by filename</td></tr>
+<tr><td>DICOM SEG</td><td><code>load_dicom_seg()</code></td><td>Returns a label map plus segment names</td></tr>
+<tr><td>DICOM SEG, overlapping</td><td><code>dicom_seg_masks()</code></td><td>Keeps every segment intact</td></tr>
+</table></div>
+
+<p>Reading a real head-and-abdomen CT series from TCIA:</p>
+
+<div class="block"><div class="bar"><span>shell</span></div><pre>voxelmetry info liver_ct/</pre></div>
+<div class="block out"><div class="bar"><span>output</span></div><pre>liver_ct
+  grid (z, y, x)       89 x 512 x 512
+  spacing (mm)         2.5 x 0.7812 x 0.7812
+  field of view (mm)   222.5 x 400.0 x 400.0
+  voxel volume (mm³)   1.5259
+  isotropic            no
+  dtype                int32
+  intensity range      -2048 to 1604</pre></div>
+
+<div class="trap"><p><span class="tag t">trap</span><strong>Never sort DICOM slices by filename.</strong>
+That series is named <code>00000001.dcm</code> through <code>00000090.dcm</code> — perfectly
+natural-sortable. Yet 46 of its 88 adjacent pairs are out of anatomical order, with a mean
+displacement of 31 slices. Sorting by name reconstructs noise and raises nothing while doing it.
+<code>load</code> orders by patient position, so this cannot happen.</p></div>
+
+<h2 id="s3"><span class="n">03</span>Measuring a structure</h2>
+<p>Every measurement is physical. Volumes in mm³ and mL, distances in mm, all derived from voxel counts
+times the true voxel volume.</p>
+
+<div class="block"><div class="bar"><span>python</span></div><pre>organ = voxelmetry.measure_label(labels, 1, "organ")
+
+print(f"{organ.volume_ml:.1f} mL")
+print(f"max diameter {organ.max_diameter_mm:.1f} mm")
+print(f"sphericity {organ.sphericity:.3f}, {organ.n_components} part(s)")</pre></div>
+<div class="block out"><div class="bar"><span>output</span></div><pre>486.1 mL
+max diameter 141.3 mm
+sphericity 0.903, 1 part(s)</pre></div>
+
+<div class="scroll"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>volume_mm3</code> / <code>volume_ml</code></td><td>Voxel count × true voxel volume. 1 mL = 1000 mm³.</td></tr>
+<tr><td><code>max_diameter_mm</code></td><td>True 3-D Feret diameter, exact over the convex hull — not a per-slice approximation.</td></tr>
+<tr><td><code>surface_area_mm2</code></td><td>Marching-cubes triangulation, calibrated against analytic spheres.</td></tr>
+<tr><td><code>sphericity</code></td><td>Equivalent-sphere area ÷ measured area. 1.0 is a sphere; a rod tends toward 0.</td></tr>
+<tr><td><code>n_components</code></td><td>Connected regions. <em>Read §09 before trusting this one.</em></td></tr>
+<tr><td><code>resolution_limited</code></td><td>True when the structure spans under 5 voxels on its thinnest axis.</td></tr>
+</table></div>
+
+<div class="was"><span class="tag v1">v1</span>Computed liver volume as
+<em>fraction of voxels at 255 × total field of view</em>, took "diameter" as the index span of the
+widest axial slice, then divided mm³ by 10⁶ and called the result litres — wrong by a factor of 1000.</div>
+
+<h2 id="s4"><span class="n">04</span>Per-lesion measurement</h2>
+<p>Aggregates mislead when one label holds several separate things: three lesions 15 mm apart report a
+combined max diameter spanning all of them.</p>
+
+<div class="block"><div class="bar"><span>python</span></div><pre>lesions = voxelmetry.measure_components(labels, 2, "lesion", min_volume_mm3=50)
+
+for m in lesions:
+    print(f"{m.name}: {m.volume_ml:.2f} mL, Ø {m.max_diameter_mm:.1f} mm")
+
+print(voxelmetry.lesion_burden(lesions, reference_volume_ml=organ.volume_ml))</pre></div>
+<div class="block out"><div class="bar"><span>output</span></div><pre>lesion_1: 2.24 mL, Ø 16.1 mm
+lesion_2: 0.59 mL, Ø 10.4 mm
+lesion_3: 0.35 mL, Ø 8.4 mm
+
+{'n_lesions': 3, 'total_volume_ml': 3.19, 'largest_volume_ml': 2.24,
+ 'largest_diameter_mm': 16.1, 'sum_of_diameters_mm': 34.9,
+ 'burden_percent': 0.656}</pre></div>
+
+<p><code>sum_of_diameters_mm</code> is what RECIST tracks between timepoints.
+<code>min_volume_mm3</code> suppresses single-voxel speckle in predicted segmentations.</p>
+
+<h2 id="s5"><span class="n">05</span>The viewer</h2>
+<p>The viewer renders whatever integer labels it is given, from one structure to a thirty-structure
+whole-body segmentation. Nothing in it is organ-specific.</p>
+
+<div class="block"><div class="bar"><span>shell</span></div><pre>voxelmetry view segmentation.nii.gz -o scene.html \
+    --labels "1=liver,2=tumour" --split 2 --min-volume 100</pre></div>
+<div class="block out"><div class="bar"><span>output</span></div><pre>wrote scene.html  (12 structures, 65,532 triangles, 1,569 KB)
+
+structure    volume (mL)  max Ø (mm)  surface (cm²)  sphericity  parts
+liver            1359.65       244.2          940.0       0.631      2
+tumour_1 *          2.68        20.2            9.8       0.952      1
+tumour_2 *          0.89        13.3            4.0       1.000      1
+...</pre></div>
+
+<p>Or from Python, with more control:</p>
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.viewer import scene_from_labelmap, write
+
+scene = scene_from_labelmap(
+    labels,
+    names={1: "liver", 2: "tumour"},
+    split_labels=(2,),            # one mesh and one row per lesion
+    max_faces_per_structure=40_000,
+)
+write(scene, "scene.html")</pre></div>
+
+<figure>
+  <img src="hepatic_montage.png" alt="A liver shown solid, then at 16 percent opacity revealing branching vessel trees and metastases inside it, then with the liver hidden entirely">
+  <figcaption>The same scene at three opacity settings, from a clinical DICOM SEG. Drag to orbit,
+  scroll to zoom, shift-drag to pan; the clip plane cuts along any anatomical axis. Output is one
+  HTML file with a single external dependency.</figcaption>
+</figure>
+
+<p>The disconnected vessel stubs are not a rendering fault; see §09.</p>
+
+<div class="was"><span class="tag v1">v1</span>Fed raw marching-cubes output into Plotly's
+<code>create_trisurf</code>, which serialises every vertex as decimal text and inlines the whole
+plotly.js bundle. The committed <code>temp-plot.html</code> was <strong>18 MB for a single
+structure</strong>. Meshes are now decimated to a budget and shipped as base64 binary.</div>
+
+<h2 id="s6"><span class="n">06</span>Preprocessing CT</h2>
+<p>Preprocessing is declarative, so a run can be recorded next to its output.</p>
+
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.preprocess import PreprocessConfig, run
+
+config = PreprocessConfig(window="abdomen", isotropic_mm=1.0, denoise_mm=0.0)
+print(config.describe())
+prepped = run(ct, config)</pre></div>
+<div class="block out"><div class="bar"><span>output</span></div><pre>resample to 1.0 mm isotropic; body mask with 8.0 mm closing; abdomen window</pre></div>
+
+<p>Order matters and is fixed: resample first so later millimetre kernels act on a known grid, strip the
+table before windowing so the body mask sees true Hounsfield units, and window last because it destroys
+the HU scale. Named windows: <code>abdomen</code>, <code>liver</code>, <code>lung</code>,
+<code>bone</code>, <code>brain</code>, <code>mediastinum</code>.</p>
+
+<div class="note"><p>Structuring elements are specified in millimetres, not voxels. A 10 mm closing
+bridges 10 mm whether slices are 0.7 mm or 5 mm apart, which on anisotropic data means an ellipsoid in
+voxel space.</p></div>
+
+<h2 id="s7"><span class="n">07</span>Non-CT data</h2>
+<p>Hounsfield units are calibrated, with air near −1000 and soft tissue near 0. MR, ultrasound and
+already-normalised data share none of that scale, so the relevant functions check first.</p>
+
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.preprocess import is_hounsfield, apply_window
+
+mr = voxelmetry.load("liver_mr/")
+print(is_hounsfield(mr), mr.array.min(), mr.array.max())
+
+apply_window(mr, "abdomen")          # raises
+apply_window(mr, "percentile")       # correct for MR</pre></div>
+<div class="block out"><div class="bar"><span>output</span></div><pre>False 0 831
+
+ValueError: 'liver_mr' does not look like Hounsfield units (range 0 to 831), so
+the 'abdomen' window would clip away most of its range. Use window="percentile"
+for MR or other uncalibrated data, or pass an explicit (level, width).</pre></div>
+
+<div class="trap"><p><span class="tag t">trap</span>Both failures used to be silent. On that liver MR,
+<code>body_mask</code> selected 87% of the field of view, since every voxel is above −320 HU, and the
+abdomen window collapsed everything from 240 to 831 into a single value. <code>body_mask</code> now
+detects uncalibrated data and falls back to Otsu (37.9% on the same scan), and the HU window refuses
+rather than destroying the dynamic range.</p></div>
+
+<h2 id="s8"><span class="n">08</span>A whole cohort at once</h2>
+<p><code>examples/cohort_report.py</code> measures every case in a dataset in parallel and reports what
+disagrees with the rest. Records stream to JSONL and the run resumes from whatever is already there,
+so an interrupted scan over 131 large volumes keeps its work.</p>
+
+<div class="block"><div class="bar"><span>shell</span></div><pre>python examples/cohort_report.py /data/Task03_Liver \
+    --organ 1 --lesion 2 --min-lesion-mm3 100 \
+    --workers 20 --out outputs/liver_cohort.jsonl</pre></div>
+<div class="block out"><div class="bar"><span>output — 131 liver cases</span></div><pre>slice thickness (mm)  0.70 to 5.00   median 1.00
+in-plane spacing (mm) 0.557 to 1.000  median 0.768
+anisotropy (z / x)    1.2x median, up to 9.0x
+
+organ volume (mL)     542 to 3195   median 1592   IQR 1380-1850
+organ components      1 to 1777   93 case(s) not a single connected region
+  stray volume (mm3)  0.0 to 4573.0   median 8.8   worst 0.360% of its organ
+
+cases with lesions    117 of 131
+lesions per case      1 to 62   median 3   total 753
+lesion burden (%)     0.01 to 45.8   median 0.97
+largest lesion Ø (mm) 10 to 241   median 40</pre></div>
+
+<p>Slice thickness spans 7× inside a single dataset. Any pipeline with kernels tuned in voxels
+behaves differently across these cases without saying so.</p>
+
+<h2 id="s9"><span class="n">09</span>Traps</h2>
+<p>Each was found running on real data and is covered by a test.</p>
+
+<h3>Component counts are a connectivity artifact</h3>
+<p>One liver label reports 395 components at face-adjacency and 27 at 26-adjacency. 232 of those are
+single voxels touching the main body only at a corner, for 0.04% of the volume. Read
+<code>largest_component_fraction</code>, or the stray volume derived from it, not the count.</p>
+
+<h3>Anisotropy fragments tubular structures</h3>
+<p>In the picture above the hepatic vein reports 150 components, largest holding 46%. That is the
+acquisition, not the annotation: at 0.887 mm in-plane against 5 mm between slices, a 3 mm vessel is
+sampled as isolated cross-sections.</p>
+
+<h3>Shape descriptors need about five voxels</h3>
+<p>Below roughly five voxels across the thinnest axis, surface area and sphericity are dominated by
+sampling artifacts; volume and diameter stay usable. Those rows carry <code>resolution_limited</code>
+and are marked with an asterisk.</p>
+
+<h3>Marching cubes on a binary mask overestimates area by 9%</h3>
+<p>A hard 0/1 mask traces a staircase. A 0.8-voxel Gaussian pre-smooth holds the error under 1% across
+the radii tested, but the same blur erases structures one voxel thick, so the isosurface falls back to an
+unsmoothed pass rather than returning zero. At 5 mm slice spacing a single-slice lesion is routine.</p>
+
+<h3>Flattening an overlapping DICOM SEG destroys segments</h3>
+<p>DICOM SEG permits overlap; an integer label map cannot represent it.</p>
+<div class="block out"><div class="bar"><span>the same liver, two ways</span></div><pre>flattened naively   595 mL   in 767 fragments     ← wrong
+dicom_seg_masks()  2417 mL   in 1 part            ← correct</pre></div>
+<p>A real study carried both <em>Liver</em> and <em>Liver Remnant</em> over largely the same voxels.
+Overlap now raises a warning naming what each segment lost, <code>priority=</code> chooses which wins,
+and <code>dicom_seg_masks()</code> keeps them all.</p>
+
+<h2 id="s10"><span class="n">10</span>Validation</h2>
+<p>The phantom generator emits shapes with closed-form geometry, and the tests assert against that
+arithmetic rather than against the code's own output.</p>
+
+<div class="scroll"><table>
+<tr><th>Property</th><th class="num">Result</th></tr>
+<tr><td>Sphere volume vs <code>4/3 πr³</code></td><td class="num">within 0.07%</td></tr>
+<tr><td>Sphere surface area vs <code>4πr²</code></td><td class="num">within 0.6%</td></tr>
+<tr><td>Sphere max diameter vs <code>2r</code></td><td class="num">exact to the voxel</td></tr>
+<tr><td>Sphere sphericity</td><td class="num">1.000 ± 0.003</td></tr>
+<tr><td>Volume across three different voxel grids</td><td class="num">within 0.5%</td></tr>
+<tr><td>Mesh-enclosed volume vs voxel count</td><td class="num">within 0.5%</td></tr>
+<tr><td>Volume after 20 Taubin smoothing passes</td><td class="num">within 0.5%</td></tr>
+</table></div>
+
+<p>The last row is why smoothing is Taubin and not Laplacian. Laplacian contracts a closed surface
+slightly on every iteration, so volume measured off a smoothed mesh drifts downward.</p>
+
+<div class="block"><div class="bar"><span>shell</span></div><pre>pytest              # 164 tests, incl. 39 headless checks on the generated viewer
+ruff check src tests examples</pre></div>
+
+<h2 id="s11"><span class="n">11</span>Command reference</h2>
+<div class="scroll"><table>
+<tr><th>Command</th><th>Does</th></tr>
+<tr><td><code>voxelmetry demo</code></td><td>Whole pipeline on a synthetic phantom. No data needed.</td></tr>
+<tr><td><code>voxelmetry info FILE</code></td><td>Grid, spacing, field of view, dtype, intensity range.</td></tr>
+<tr><td><code>voxelmetry measure SEG</code></td><td>Physical measurements per label. <code>--split</code>, <code>--json</code>.</td></tr>
+<tr><td><code>voxelmetry view SEG -o OUT</code></td><td>Build the interactive viewer.</td></tr>
+<tr><td><code>voxelmetry prep CT OUT</code></td><td>Window, resample, strip the table.</td></tr>
+<tr><td><code>voxelmetry convert IN OUT</code></td><td>Change format, preserving spacing and origin.</td></tr>
+</table></div>
+
+<p>Useful flags: <code>--labels "1=liver,2=tumour"</code> names structures;
+<code>--split 2</code> breaks a label into components; <code>--min-volume</code> drops speckle;
+<code>--max-faces</code> sets the triangle budget per structure.</p>
+
+<footer>
+  <p><strong>voxelmetry 2.0</strong> — a rebuild of a 2020 liver-segmentation project.
+  Data shown: Medical Segmentation Decathlon Task03 Liver and TCIA
+  Colorectal-Liver-Metastases, both CC-BY. No patient-identifiable data appears anywhere on this page.</p>
+</footer>
+</main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // Build the contents rail from the headings, so it can never fall out of sync.
+  var heads = [].slice.call(document.querySelectorAll('main h2'));
+  var toc = document.getElementById('toc');
+  var links = heads.map(function(h){
+    var num = h.querySelector('.n');
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    var n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = num ? num.textContent : '';
+    var t = document.createElement('span');
+    t.textContent = h.textContent.replace(/^\d+/, '').trim();
+    a.appendChild(n); a.appendChild(t);
+    li.appendChild(a); toc.appendChild(li);
+    return a;
+  });
+
+  // Highlight the section currently in view: the last heading whose top has
+  // passed the fold line. Recomputed on scroll rather than tracked
+  // incrementally, which keeps it correct after resizes and hash jumps.
+  function markCurrent(){
+    var passed = heads.filter(function(h){ return h.getBoundingClientRect().top < 140; });
+    var id = (passed.length ? passed[passed.length - 1] : heads[0]).id;
+    links.forEach(function(a){ a.classList.toggle('on', a.getAttribute('href') === '#' + id); });
+  }
+  var ticking = false;
+  function onScroll(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ markCurrent(); ticking = false; });
+  }
+  window.addEventListener('scroll', onScroll, {passive: true});
+  window.addEventListener('resize', onScroll);
+  markCurrent();
+
+  // Copy buttons on every block.
+  [].forEach.call(document.querySelectorAll('.block'), function(block){
+    var bar = block.querySelector('.bar');
+    var pre = block.querySelector('pre');
+    if (!bar || !pre) return;
+    var btn = document.createElement('button');
+    btn.className = 'copy';
+    btn.type = 'button';
+    btn.textContent = 'copy';
+    btn.addEventListener('click', function(){
+      var done = function(ok){
+        btn.textContent = ok ? 'copied' : 'select manually';
+        setTimeout(function(){ btn.textContent = 'copy'; }, 1600);
+      };
+      try {
+        navigator.clipboard.writeText(pre.textContent).then(function(){ done(true); },
+                                                            function(){ done(false); });
+      } catch (e) { done(false); }
+    });
+    bar.appendChild(btn);
+  });
+})();
+</script>
