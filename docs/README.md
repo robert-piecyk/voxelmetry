@@ -1,7 +1,9 @@
 # docs/
 
-Published to GitHub Pages by `.github/workflows/pages.yml` on any push to
-`main` that touches this directory. The directory is served as-is; there is no
+Live at <https://robert-piecyk.github.io/voxelmetry/>.
+
+Published by `.github/workflows/pages.yml` on any push to `main` that touches
+this directory. The directory is served as-is; there is no
 build step, so `index.html` must keep referencing its images relatively.
 
 | File | What it is |
