@@ -18,6 +18,18 @@ Two live demos, both built from real public data by the commands below:
 Drag to orbit, drop the opacity to see structures inside the organ, or cut
 through with the clip plane.
 
+![Liver, hepatic and portal vein trees and five metastases, shown solid, with the liver at 16% opacity, and with the liver hidden](docs/hepatic_montage.png)
+
+*The same scene at three opacity settings, straight from a clinical DICOM SEG.
+The disconnected vessel stubs are not noise: at 0.887 mm in-plane against 5 mm
+between slices, a vessel a few millimetres across is sampled as isolated
+cross-sections. The measurements say the same thing — the hepatic vein reports
+150 components with the largest holding 46%.*
+
+These are rendered by `examples/render_views.py`, which draws the same meshes
+the viewer draws through the same scene assembly, so the pictures cannot drift
+from the tool.
+
 ```bash
 nrrdvis view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
 ```
