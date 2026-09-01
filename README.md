@@ -7,10 +7,16 @@ Point it at any labelled segmentation — CT or MR, one structure or thirty — 
 it measures every label in physical units and writes a self-contained HTML page
 you can open, share or host.
 
-**[Live demo](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)**
-— case `liver_108` from MSD Task03: 57 tumours at 43% hepatic burden, the
-heaviest case in the cohort. Drag to orbit, drop the opacity to see the lesions
-inside the organ, or cut through it with the clip plane.
+Two live demos, both built from real public data by the commands below:
+
+- **[Liver Morphometry Viewer](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)**
+  — MSD Task03 case `liver_108`: 57 tumours at 43% hepatic burden.
+- **[Hepatic Segmentation Viewer](https://claude.ai/code/artifact/74d55290-1449-4e58-bb86-f1ce26e77257)**
+  — a clinical **DICOM SEG** from TCIA Colorectal-Liver-Metastases: liver, the
+  hepatic and portal vein trees, and five metastases.
+
+Drag to orbit, drop the opacity to see structures inside the organ, or cut
+through with the clip plane.
 
 ```bash
 nrrdvis view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
@@ -54,6 +60,7 @@ Neither fact is visible from a rendering alone.
 - [The viewer](#the-viewer)
 - [Measurements](#measurements)
 - [How it is validated](#how-it-is-validated)
+- [Modalities](#modalities)
 - [What 131 livers looked like](#what-131-livers-looked-like)
 - [Python API](#python-api)
 - [What changed from v1](#what-changed-from-v1)
@@ -119,6 +126,18 @@ nrrdvis convert dicom_directory/ volume.nrrd
 
 `--split` breaks a label into connected components so multifocal disease is
 measured lesion by lesion instead of as one blob.
+
+### Formats
+
+| Input | Notes |
+|---|---|
+| NIfTI, NRRD, MetaImage | Single files, read through SimpleITK |
+| DICOM series (directory) | Ordered by ImagePositionPatient, never by filename |
+| DICOM SEG | `load_dicom_seg()` for a label map, `dicom_seg_masks()` when segments overlap |
+
+CT is assumed to be in Hounsfield units. MR and other uncalibrated data are
+detected, and the parts of preprocessing that need an absolute scale either
+adapt or refuse — see [Modalities](#modalities).
 
 ### Getting a dataset
 
@@ -201,9 +220,24 @@ tested; the tests pin both the corrected value *and* the uncorrected artifact,
 so a regression in the fix is visible rather than silent.
 
 ```bash
-pytest              # 113 tests, including 39 headless checks on the generated viewer
+pytest              # 138 tests, including 39 headless checks on the generated viewer
 ruff check src tests
 ```
+
+## Modalities
+
+Preprocessing was written for CT, where Hounsfield units are calibrated so air
+sits near −1000. Nothing else shares that scale, and the failures were silent
+until they were checked against a real liver MR from TCGA-LIHC (intensities 0
+to 831):
+
+| Operation | On non-HU data before | Now |
+|---|---|---|
+| `body_mask` | Selected **87%** of the field of view — every voxel is "above −320 HU" | Detects uncalibrated data, falls back to an Otsu threshold: **37.9%** |
+| `apply_window("abdomen")` | Clipped to [−160, 240], collapsing everything above 240 into one value | Raises, and points at `window="percentile"` |
+
+`is_hounsfield()` is the check; `percentile_window()` is the alternative for
+data with no absolute scale. CT behaviour is unchanged and pinned by a test.
 
 ## What 131 livers looked like
 
@@ -325,10 +359,13 @@ different physical gap on every scanner. Structuring elements are now specified
 in millimetres and converted per volume, which on anisotropic data means an
 ellipsoid in voxel space.
 
-**Slices were ordered by filename.** Natural-sorting `image_0`…`image_128`
-happens to work; any series whose filenames do not encode acquisition order
-produced a scrambled or mirrored volume. Ordering now comes from
-ImagePositionPatient.
+**Slices were ordered by filename.** This is not a theoretical risk. A liver CT
+from TCIA (HCC-TACE-Seg) is named `00000001.dcm` onward — perfectly
+natural-sortable — yet **46 of its 88 adjacent pairs are out of anatomical
+order**, with a mean index displacement of 31 slices. v1 would have
+reconstructed noise from it and raised no error. Ordering now comes from
+ImagePositionPatient, and a test writes a deliberately shuffled series to prove
+it.
 
 **Processing was 2-D throughout.** The body mask was computed per slice, so a
 slice where the body split into two blobs — routine at the top and bottom of a
