@@ -22,7 +22,7 @@ from .viewer import scene_from_labelmap
 
 app = typer.Typer(
     add_completion=False,
-    help="Physical-unit morphometry and a shareable 3-D viewer for medical segmentations.",
+    help="Morphometry for CT and MR segmentations, with a 3-D viewer that fits in one HTML file.",
 )
 console = Console()
 

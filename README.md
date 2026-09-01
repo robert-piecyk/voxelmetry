@@ -1,6 +1,6 @@
 # voxelmetry
 
-Physical-unit morphometry and a shareable 3-D viewer for medical segmentations.
+Morphometry for CT and MR segmentations, with a 3-D viewer that fits in one HTML file.
 
 Reads medical image volumes, measures the structures in them in millimetres and
 litres, and writes an interactive 3-D viewer as a single HTML file. Works on any

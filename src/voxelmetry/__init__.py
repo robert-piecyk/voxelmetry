@@ -1,4 +1,4 @@
-"""voxelmetry: physical-unit morphometry and a shareable 3-D viewer for medical segmentations."""
+"""voxelmetry: morphometry for CT and MR segmentations, with a 3-D viewer that fits in one HTML file."""
 
 from .io import dicom_seg_masks, load, load_dicom_seg, load_dicom_series, save
 from .measure import (

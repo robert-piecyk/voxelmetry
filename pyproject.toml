@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "voxelmetry"
 version = "2.0.0"
-description = "Physical-unit morphometry and a shareable 3-D viewer for medical segmentations."
+description = "Morphometry for CT and MR segmentations, with a 3-D viewer that fits in one HTML file."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -29,6 +29,11 @@ dicom = ["pydicom>=2.4"]
 mesh = ["trimesh>=4.0", "fast-simplification>=0.1.7"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
 all = ["voxelmetry[dicom,mesh,dev]"]
+
+[project.urls]
+Homepage = "https://github.com/robert-piecyk/voxelmetry"
+Documentation = "https://robert-piecyk.github.io/voxelmetry/"
+Source = "https://github.com/robert-piecyk/voxelmetry"
 
 [project.scripts]
 voxelmetry = "voxelmetry.cli:app"
