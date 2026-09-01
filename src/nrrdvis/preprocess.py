@@ -32,6 +32,48 @@ HU_WINDOWS: dict[str, tuple[float, float]] = {
 AIR_THRESHOLD_HU = -320.0
 
 
+def is_hounsfield(volume: Volume) -> bool:
+    """Whether the intensities look like calibrated Hounsfield units.
+
+    CT is calibrated so air sits near -1000 and soft tissue near 0. MR,
+    ultrasound and already-normalised data carry arbitrary intensities, often
+    unsigned, where a Hounsfield threshold means nothing. Everything in this
+    module that assumes HU checks here first, because the failure is otherwise
+    silent: a real liver MR from TCGA-LIHC ranges 0 to 831, so ``> -320 HU``
+    selects the entire field of view and the body mask looks like it worked.
+
+    The test is deliberately loose -- air present well below zero, and some
+    tissue above it -- so it accepts a cropped or partially windowed CT while
+    rejecting anything unsigned.
+    """
+    return bool(volume.array.min() < -300 and volume.array.max() > 100)
+
+
+def percentile_window(volume: Volume, low: float = 1.0, high: float = 99.0) -> Volume:
+    """Window by intensity percentile, for data with no absolute scale.
+
+    The right default for MR, where a fixed window is meaningless because the
+    intensities depend on the sequence, the scanner and the coil.
+
+    Args:
+        volume: Input volume.
+        low: Lower percentile, pinned to 0.
+        high: Upper percentile, pinned to 1.
+
+    Returns:
+        The volume rescaled to ``[0, 1]`` as float32.
+
+    Raises:
+        ValueError: If ``high`` is not above ``low``.
+    """
+    if high <= low:
+        raise ValueError(f"percentile_window requires high > low, got {low} and {high}")
+    lo, hi = np.percentile(volume.array, [low, high])
+    if hi <= lo:  # pragma: no cover - a constant volume
+        return volume.with_array(np.zeros(volume.shape, dtype=np.float32))
+    return volume.window(float(lo), float(hi), mode="normalize")
+
+
 def window_bounds(window: str | tuple[float, float]) -> tuple[float, float]:
     """Resolve a named window or a ``(level, width)`` pair into ``(low, high)``.
 
@@ -53,8 +95,37 @@ def window_bounds(window: str | tuple[float, float]) -> tuple[float, float]:
     return level - width / 2.0, level + width / 2.0
 
 
-def apply_window(volume: Volume, window: str | tuple[float, float] = "abdomen") -> Volume:
-    """Apply a named or explicit HU window, normalised to ``[0, 1]``."""
+def apply_window(
+    volume: Volume,
+    window: str | tuple[float, float] = "abdomen",
+) -> Volume:
+    """Apply a named or explicit HU window, normalised to ``[0, 1]``.
+
+    Args:
+        volume: Input volume in Hounsfield units.
+        window: A key of :data:`HU_WINDOWS`, an explicit ``(level, width)``, or
+            ``"percentile"`` for data with no absolute intensity scale.
+
+    Returns:
+        The windowed volume, rescaled to ``[0, 1]``.
+
+    Raises:
+        ValueError: If a Hounsfield window is requested for data that is not in
+            Hounsfield units. Applying one anyway silently destroys most of the
+            dynamic range rather than failing, so this refuses instead.
+    """
+    if window == "percentile":
+        return percentile_window(volume)
+
+    if not is_hounsfield(volume):
+        raise ValueError(
+            f"{volume.name!r} does not look like Hounsfield units "
+            f"(range {volume.array.min():g} to {volume.array.max():g}), so the "
+            f"{window!r} window would clip away most of its range. Use "
+            'window="percentile" for MR or other uncalibrated data, or pass an '
+            "explicit (level, width) if you know the scale."
+        )
+
     low, high = window_bounds(window)
     return volume.window(low, high, mode="normalize")
 
@@ -75,7 +146,7 @@ def _ball_voxels(radius_mm: float, spacing: tuple[float, float, float]) -> np.nd
 
 def body_mask(
     volume: Volume,
-    threshold_hu: float = AIR_THRESHOLD_HU,
+    threshold_hu: float | None = None,
     closing_mm: float = 8.0,
     fill_holes: bool = True,
 ) -> np.ndarray:
@@ -91,13 +162,28 @@ def body_mask(
 
     Args:
         volume: Input CT volume in Hounsfield units.
-        threshold_hu: Everything above this counts as tissue.
+        threshold_hu: Everything above this counts as tissue. When omitted,
+            a Hounsfield volume uses :data:`AIR_THRESHOLD_HU` and anything else
+            falls back to an Otsu threshold computed from the data, since a
+            fixed HU cut is meaningless without an absolute scale.
         closing_mm: Physical radius used to close gaps in the body outline.
         fill_holes: Whether to fill enclosed air pockets, e.g. bowel gas.
 
     Returns:
         A boolean mask of the body, shaped like ``volume``.
     """
+    if threshold_hu is None:
+        if is_hounsfield(volume):
+            threshold_hu = AIR_THRESHOLD_HU
+        else:
+            # Otsu splits background from foreground on whatever scale the data
+            # happens to use. Less precise than a calibrated HU cut, but it is
+            # the difference between a mask and a mask of everything.
+            from skimage.filters import threshold_otsu
+
+            sample = volume.array[:: max(volume.shape[0] // 32, 1)]
+            threshold_hu = float(threshold_otsu(sample))
+
     tissue = volume.array > threshold_hu
     if not tissue.any():
         return np.zeros(volume.shape, dtype=bool)
@@ -199,6 +285,8 @@ class PreprocessConfig:
     """
 
     window: str | tuple[float, float] | None = "abdomen"
+    """A HU window name, an explicit (level, width), "percentile" for
+    uncalibrated data such as MR, or None to leave intensities alone."""
     isotropic_mm: float | None = 1.0
     denoise_mm: float = 0.0
     denoise_method: str = "gaussian"

@@ -109,3 +109,72 @@ def test_config_describe_lists_the_active_steps():
 def test_empty_config_describes_itself_as_a_noop():
     config = npre.PreprocessConfig(window=None, isotropic_mm=None, strip_table=False)
     assert config.describe() == "no-op"
+
+
+# --- modality awareness -----------------------------------------------------
+# Driven by a real TCGA-LIHC liver MR: intensities 0 to 831, where the HU
+# threshold selected 87% of the field of view and the abdomen window collapsed
+# everything above 240 to a single value, both without any error.
+
+
+def make_mr_like(shape=(20, 40, 40), seed=0):
+    """Unsigned, uncalibrated intensities of the kind an MR series carries."""
+    rng = np.random.default_rng(seed)
+    array = rng.integers(0, 40, size=shape).astype(np.uint16)  # noise background
+    array[4:16, 10:30, 10:30] = rng.integers(300, 800, size=(12, 20, 20))  # body
+    return Volume(array, spacing=(3.5, 1.25, 1.25), name="mr_like")
+
+
+def test_hounsfield_detection(torso):
+    image, _ = torso
+    assert npre.is_hounsfield(image)
+    assert not npre.is_hounsfield(make_mr_like())
+
+
+def test_already_normalised_data_is_not_treated_as_hounsfield():
+    normalised = Volume(np.linspace(0, 1, 8**3).reshape(8, 8, 8).astype(np.float32))
+    assert not npre.is_hounsfield(normalised)
+
+
+def test_hu_window_refuses_non_hounsfield_data():
+    """Silently destroying the dynamic range is worse than failing."""
+    with pytest.raises(ValueError, match="does not look like Hounsfield"):
+        npre.apply_window(make_mr_like(), "abdomen")
+
+
+def test_percentile_window_preserves_dynamic_range():
+    mr = make_mr_like()
+    windowed = npre.apply_window(mr, "percentile")
+    assert windowed.array.min() == pytest.approx(0.0)
+    assert windowed.array.max() == pytest.approx(1.0)
+    # A HU window would have crushed the top of the range into one value.
+    assert len(np.unique(windowed.array)) > 100
+
+
+def test_percentile_window_rejects_inverted_bounds():
+    with pytest.raises(ValueError, match="high > low"):
+        npre.percentile_window(make_mr_like(), low=99.0, high=1.0)
+
+
+def test_body_mask_falls_back_to_otsu_for_non_hounsfield_data():
+    """The HU threshold is meaningless here; Otsu recovers the true body."""
+    mr = make_mr_like()
+
+    # The silent failure being avoided: every voxel is "above -320 HU", so the
+    # threshold selects the entire volume and the mask means nothing.
+    assert (mr.array > npre.AIR_THRESHOLD_HU).all()
+
+    auto = npre.body_mask(mr)
+    true_body_fraction = (12 * 20 * 20) / (20 * 40 * 40)
+    assert auto.mean() == pytest.approx(true_body_fraction, abs=0.03)
+    # And it found the bright region rather than the noise floor.
+    assert auto[10, 20, 20]
+    assert not auto[0, 0, 0]
+
+
+def test_hounsfield_data_still_uses_the_calibrated_threshold(torso):
+    """Auto-detection must not change behaviour on the CT path."""
+    image, _ = torso
+    np.testing.assert_array_equal(
+        npre.body_mask(image), npre.body_mask(image, threshold_hu=npre.AIR_THRESHOLD_HU)
+    )
