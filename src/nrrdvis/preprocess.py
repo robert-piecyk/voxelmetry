@@ -195,7 +195,19 @@ def body_mask(
         tissue = components == int(sizes.argmax())
 
     if closing_mm > 0:
-        tissue = ndimage.binary_closing(tissue, structure=_ball_voxels(closing_mm, volume.spacing))
+        structure = _ball_voxels(closing_mm, volume.spacing)
+        # Closing dilates then erodes, and scipy treats everything outside the
+        # array as background during the erosion. A body that extends through
+        # the edge of the field of view -- which is every abdominal CT at the
+        # top and bottom of the slab, and most at the sides -- is therefore
+        # eaten away at the border. Measured on a real TCIA liver CT, an 8 mm
+        # closing emptied the first and last slices completely: 47% of the
+        # first slice became 0%. Padding with foreground first makes the
+        # erosion see tissue continuing past the edge, which is the truth.
+        pad = [(n // 2 + 1, n // 2 + 1) for n in structure.shape]
+        padded = np.pad(tissue, pad, mode="edge")
+        padded = ndimage.binary_closing(padded, structure=structure)
+        tissue = padded[tuple(slice(lo, -hi) for lo, hi in pad)]
 
     if fill_holes:
         # Fill per slice as well as in 3D: a structure open at the top and

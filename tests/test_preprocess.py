@@ -178,3 +178,36 @@ def test_hounsfield_data_still_uses_the_calibrated_threshold(torso):
     np.testing.assert_array_equal(
         npre.body_mask(image), npre.body_mask(image, threshold_hu=npre.AIR_THRESHOLD_HU)
     )
+
+
+def test_closing_does_not_erode_a_body_that_reaches_the_field_of_view_edge():
+    """Found on a real TCIA liver CT: an 8 mm closing emptied the end slices.
+
+    binary_closing erodes after dilating, and scipy treats everything outside
+    the array as background, so a body continuing past the edge of the scan
+    gets eaten there. Every abdominal CT does this at the top and bottom of
+    the slab, so the failure was universal and silent.
+    """
+    array = np.full((24, 40, 40), HU_AIR, dtype=np.int16)
+    # A column of tissue spanning the entire z extent, touching both ends.
+    array[:, 12:28, 12:28] = 50
+    volume = Volume(array, spacing=(2.5, 1.0, 1.0))
+
+    without = npre.body_mask(volume, closing_mm=0.0)
+    with_closing = npre.body_mask(volume, closing_mm=8.0)
+
+    assert without[0].any() and without[-1].any()
+    assert with_closing[0].any(), "closing emptied the first slice"
+    assert with_closing[-1].any(), "closing emptied the last slice"
+    # Closing may add voxels but must never remove the body wholesale.
+    assert with_closing.sum() >= without.sum() * 0.98
+
+
+@pytest.mark.parametrize("closing_mm", [0.0, 4.0, 8.0, 12.0])
+def test_body_fraction_is_stable_across_closing_radii(closing_mm):
+    """Closing fills gaps; it must not steadily shrink the body."""
+    array = np.full((20, 40, 40), HU_AIR, dtype=np.int16)
+    array[3:17, 10:30, 10:30] = 50
+    volume = Volume(array, spacing=(2.5, 1.0, 1.0))
+    fraction = npre.body_mask(volume, closing_mm=closing_mm).mean()
+    assert fraction == pytest.approx((14 * 20 * 20) / (20 * 40 * 40), abs=0.05)
