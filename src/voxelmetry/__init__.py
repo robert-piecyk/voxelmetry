@@ -1,4 +1,4 @@
-"""nrrdvis: spacing-aware 3-D medical volume processing, morphometry and viewing."""
+"""voxelmetry: physical-unit morphometry and a shareable 3-D viewer for medical segmentations."""
 
 from .io import dicom_seg_masks, load, load_dicom_seg, load_dicom_series, save
 from .measure import (

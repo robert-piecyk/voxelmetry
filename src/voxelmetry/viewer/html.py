@@ -1,4 +1,4 @@
-"""Render a :class:`~nrrdvis.viewer.scene.Scene` to a self-contained HTML page.
+"""Render a :class:`~voxelmetry.viewer.scene.Scene` to a self-contained HTML page.
 
 Geometry travels as base64-encoded binary in a single inline JSON blob and is
 decoded into typed arrays in the browser, which is roughly four times smaller

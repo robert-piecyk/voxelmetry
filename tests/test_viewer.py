@@ -6,10 +6,10 @@ import re
 
 import numpy as np
 
-from nrrdvis.phantom import TORSO_LABEL_NAMES
-from nrrdvis.viewer import html as nhtml
-from nrrdvis.viewer import scene as nscene
-from nrrdvis.volume import Volume
+from voxelmetry.phantom import TORSO_LABEL_NAMES
+from voxelmetry.viewer import html as nhtml
+from voxelmetry.viewer import scene as nscene
+from voxelmetry.volume import Volume
 
 
 def test_scene_is_built_from_whatever_labels_are_present():

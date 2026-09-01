@@ -1,4 +1,4 @@
-<title>nrrdvis Field Guide</title>
+<title>voxelmetry Field Guide</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,600&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -149,14 +149,14 @@
 
 <div id="shell">
 <nav id="rail" aria-label="Contents">
-  <div class="brand">nrrdvis</div>
+  <div class="brand">voxelmetry</div>
   <div class="brandsub">Field guide, v2.0</div>
   <ol id="toc"></ol>
 </nav>
 
 <main>
 <h1>Reading, measuring and viewing medical volumes</h1>
-<p class="lede">Working guide to <code>nrrdvis</code>: reading volumes, measuring structures in
+<p class="lede">Working guide to <code>voxelmetry</code>: reading volumes, measuring structures in
 millimetres and litres, and turning a segmentation into a 3-D viewer. All output shown is from real
 runs.</p>
 
@@ -172,7 +172,7 @@ runs.</p>
 required.</p>
 
 <div class="block"><div class="bar"><span>shell</span></div><pre>pip install -e ".[all]"
-nrrdvis demo -o demo.html</pre></div>
+voxelmetry demo -o demo.html</pre></div>
 
 <div class="block out"><div class="bar"><span>output</span></div><pre>wrote demo.html (902 KB)
 
@@ -192,7 +192,7 @@ its short axis for its shape figures to mean much; its volume and diameter are u
 <p>A volume is voxels plus the millimetres-per-voxel needed to interpret them. Held in separate
 variables, the first resize invalidates every measurement taken afterwards.</p>
 
-<div class="block"><div class="bar"><span>python</span></div><pre>from nrrdvis.phantom import torso_phantom
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.phantom import torso_phantom
 
 image, labels = torso_phantom()
 print(image)
@@ -217,11 +217,11 @@ whatever factor the resize applied.</div>
 <h2 id="s2"><span class="n">02</span>Loading data</h2>
 <p>One function reads everything. Point it at a file or at a directory of DICOM slices.</p>
 
-<div class="block"><div class="bar"><span>python</span></div><pre>import nrrdvis
+<div class="block"><div class="bar"><span>python</span></div><pre>import voxelmetry
 
-vol = nrrdvis.load("scan.nii.gz")        # NIfTI, NRRD, MetaImage
-ct  = nrrdvis.load("dicom_directory/")   # a DICOM series
-nrrdvis.save(vol, "out.nrrd")            # format from the extension</pre></div>
+vol = voxelmetry.load("scan.nii.gz")        # NIfTI, NRRD, MetaImage
+ct  = voxelmetry.load("dicom_directory/")   # a DICOM series
+voxelmetry.save(vol, "out.nrrd")            # format from the extension</pre></div>
 
 <div class="scroll"><table>
 <tr><th>Input</th><th>How</th><th>Notes</th></tr>
@@ -233,7 +233,7 @@ nrrdvis.save(vol, "out.nrrd")            # format from the extension</pre></div>
 
 <p>Reading a real head-and-abdomen CT series from TCIA:</p>
 
-<div class="block"><div class="bar"><span>shell</span></div><pre>nrrdvis info liver_ct/</pre></div>
+<div class="block"><div class="bar"><span>shell</span></div><pre>voxelmetry info liver_ct/</pre></div>
 <div class="block out"><div class="bar"><span>output</span></div><pre>liver_ct
   grid (z, y, x)       89 x 512 x 512
   spacing (mm)         2.5 x 0.7812 x 0.7812
@@ -253,7 +253,7 @@ displacement of 31 slices. Sorting by name reconstructs noise and raises nothing
 <p>Every measurement is physical. Volumes in mm³ and mL, distances in mm, all derived from voxel counts
 times the true voxel volume.</p>
 
-<div class="block"><div class="bar"><span>python</span></div><pre>organ = nrrdvis.measure_label(labels, 1, "organ")
+<div class="block"><div class="bar"><span>python</span></div><pre>organ = voxelmetry.measure_label(labels, 1, "organ")
 
 print(f"{organ.volume_ml:.1f} mL")
 print(f"max diameter {organ.max_diameter_mm:.1f} mm")
@@ -280,12 +280,12 @@ widest axial slice, then divided mm³ by 10⁶ and called the result litres — 
 <p>Aggregates mislead when one label holds several separate things: three lesions 15 mm apart report a
 combined max diameter spanning all of them.</p>
 
-<div class="block"><div class="bar"><span>python</span></div><pre>lesions = nrrdvis.measure_components(labels, 2, "lesion", min_volume_mm3=50)
+<div class="block"><div class="bar"><span>python</span></div><pre>lesions = voxelmetry.measure_components(labels, 2, "lesion", min_volume_mm3=50)
 
 for m in lesions:
     print(f"{m.name}: {m.volume_ml:.2f} mL, Ø {m.max_diameter_mm:.1f} mm")
 
-print(nrrdvis.lesion_burden(lesions, reference_volume_ml=organ.volume_ml))</pre></div>
+print(voxelmetry.lesion_burden(lesions, reference_volume_ml=organ.volume_ml))</pre></div>
 <div class="block out"><div class="bar"><span>output</span></div><pre>lesion_1: 2.24 mL, Ø 16.1 mm
 lesion_2: 0.59 mL, Ø 10.4 mm
 lesion_3: 0.35 mL, Ø 8.4 mm
@@ -301,7 +301,7 @@ lesion_3: 0.35 mL, Ø 8.4 mm
 <p>The viewer renders whatever integer labels it is given, from one structure to a thirty-structure
 whole-body segmentation. Nothing in it is organ-specific.</p>
 
-<div class="block"><div class="bar"><span>shell</span></div><pre>nrrdvis view segmentation.nii.gz -o scene.html \
+<div class="block"><div class="bar"><span>shell</span></div><pre>voxelmetry view segmentation.nii.gz -o scene.html \
     --labels "1=liver,2=tumour" --split 2 --min-volume 100</pre></div>
 <div class="block out"><div class="bar"><span>output</span></div><pre>wrote scene.html  (12 structures, 65,532 triangles, 1,569 KB)
 
@@ -312,7 +312,7 @@ tumour_2 *          0.89        13.3            4.0       1.000      1
 ...</pre></div>
 
 <p>Or from Python, with more control:</p>
-<div class="block"><div class="bar"><span>python</span></div><pre>from nrrdvis.viewer import scene_from_labelmap, write
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.viewer import scene_from_labelmap, write
 
 scene = scene_from_labelmap(
     labels,
@@ -339,7 +339,7 @@ structure</strong>. Meshes are now decimated to a budget and shipped as base64 b
 <h2 id="s6"><span class="n">06</span>Preprocessing CT</h2>
 <p>Preprocessing is declarative, so a run can be recorded next to its output.</p>
 
-<div class="block"><div class="bar"><span>python</span></div><pre>from nrrdvis.preprocess import PreprocessConfig, run
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.preprocess import PreprocessConfig, run
 
 config = PreprocessConfig(window="abdomen", isotropic_mm=1.0, denoise_mm=0.0)
 print(config.describe())
@@ -359,9 +359,9 @@ voxel space.</p></div>
 <p>Hounsfield units are calibrated, with air near −1000 and soft tissue near 0. MR, ultrasound and
 already-normalised data share none of that scale, so the relevant functions check first.</p>
 
-<div class="block"><div class="bar"><span>python</span></div><pre>from nrrdvis.preprocess import is_hounsfield, apply_window
+<div class="block"><div class="bar"><span>python</span></div><pre>from voxelmetry.preprocess import is_hounsfield, apply_window
 
-mr = nrrdvis.load("liver_mr/")
+mr = voxelmetry.load("liver_mr/")
 print(is_hounsfield(mr), mr.array.min(), mr.array.max())
 
 apply_window(mr, "abdomen")          # raises
@@ -457,12 +457,12 @@ ruff check src tests examples</pre></div>
 <h2 id="s11"><span class="n">11</span>Command reference</h2>
 <div class="scroll"><table>
 <tr><th>Command</th><th>Does</th></tr>
-<tr><td><code>nrrdvis demo</code></td><td>Whole pipeline on a synthetic phantom. No data needed.</td></tr>
-<tr><td><code>nrrdvis info FILE</code></td><td>Grid, spacing, field of view, dtype, intensity range.</td></tr>
-<tr><td><code>nrrdvis measure SEG</code></td><td>Physical measurements per label. <code>--split</code>, <code>--json</code>.</td></tr>
-<tr><td><code>nrrdvis view SEG -o OUT</code></td><td>Build the interactive viewer.</td></tr>
-<tr><td><code>nrrdvis prep CT OUT</code></td><td>Window, resample, strip the table.</td></tr>
-<tr><td><code>nrrdvis convert IN OUT</code></td><td>Change format, preserving spacing and origin.</td></tr>
+<tr><td><code>voxelmetry demo</code></td><td>Whole pipeline on a synthetic phantom. No data needed.</td></tr>
+<tr><td><code>voxelmetry info FILE</code></td><td>Grid, spacing, field of view, dtype, intensity range.</td></tr>
+<tr><td><code>voxelmetry measure SEG</code></td><td>Physical measurements per label. <code>--split</code>, <code>--json</code>.</td></tr>
+<tr><td><code>voxelmetry view SEG -o OUT</code></td><td>Build the interactive viewer.</td></tr>
+<tr><td><code>voxelmetry prep CT OUT</code></td><td>Window, resample, strip the table.</td></tr>
+<tr><td><code>voxelmetry convert IN OUT</code></td><td>Change format, preserving spacing and origin.</td></tr>
 </table></div>
 
 <p>Useful flags: <code>--labels "1=liver,2=tumour"</code> names structures;
@@ -470,7 +470,7 @@ ruff check src tests examples</pre></div>
 <code>--max-faces</code> sets the triangle budget per structure.</p>
 
 <footer>
-  <p><strong>nrrdvis 2.0</strong> — a rebuild of a 2020 liver-segmentation project.
+  <p><strong>voxelmetry 2.0</strong> — a rebuild of a 2020 liver-segmentation project.
   Data shown: Medical Segmentation Decathlon Task03 Liver and TCIA
   Colorectal-Liver-Metastases, both CC-BY. No patient-identifiable data appears anywhere on this page.</p>
 </footer>

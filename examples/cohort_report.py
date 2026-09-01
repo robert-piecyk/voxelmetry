@@ -22,9 +22,9 @@ from pathlib import Path
 
 import numpy as np
 
-from nrrdvis.datasets import MSDDataset
-from nrrdvis.io import load
-from nrrdvis.measure import lesion_burden, measure_components, measure_label
+from voxelmetry.datasets import MSDDataset
+from voxelmetry.io import load
+from voxelmetry.measure import lesion_burden, measure_components, measure_label
 
 
 def profile_case(args: tuple[str, str, int, int | None, float, bool]) -> dict:

@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 from typer.testing import CliRunner
 
-from nrrdvis import io as nio
-from nrrdvis.cli import _parse_labels, _parse_split, app
-from nrrdvis.phantom import torso_phantom
+from voxelmetry import io as nio
+from voxelmetry.cli import _parse_labels, _parse_split, app
+from voxelmetry.phantom import torso_phantom
 
 runner = CliRunner()
 
@@ -132,7 +132,7 @@ def test_unknown_window_is_reported(scan, tmp_path):
 
 def test_view_on_an_empty_segmentation(tmp_path):
     """No labels is a legitimate input, not a crash."""
-    from nrrdvis.volume import Volume
+    from voxelmetry.volume import Volume
 
     empty = nio.save(Volume(np.zeros((16, 16, 16), np.uint8)), tmp_path / "empty.nrrd")
     result = runner.invoke(app, ["view", str(empty), "-o", str(tmp_path / "e.html")])

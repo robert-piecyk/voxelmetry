@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from nrrdvis.volume import Volume
+from voxelmetry.volume import Volume
 
 
 def test_rejects_non_3d_array():

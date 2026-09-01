@@ -16,16 +16,16 @@ from pathlib import Path
 
 import numpy as np
 
-from nrrdvis.io import load
-from nrrdvis.mesh import Mesh
-from nrrdvis.viewer import Scene, scene_from_labelmap
+from voxelmetry.io import load
+from voxelmetry.mesh import Mesh
+from voxelmetry.viewer import Scene, scene_from_labelmap
 
 BACKGROUND = "#14171a"
 CAPTION = "#c8ccd0"
 
 
 def to_polydata(mesh: Mesh):
-    """Convert a :class:`~nrrdvis.mesh.Mesh` to PyVista's face-array layout."""
+    """Convert a :class:`~voxelmetry.mesh.Mesh` to PyVista's face-array layout."""
     import pyvista as pv
 
     faces = np.hstack(
@@ -187,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("docs/scene"))
     args = parser.parse_args(argv)
 
-    from nrrdvis.cli import _parse_labels, _parse_split
+    from voxelmetry.cli import _parse_labels, _parse_split
 
     labelmap = load(args.labelmap)
     scene = scene_from_labelmap(

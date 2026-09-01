@@ -3,13 +3,13 @@
 import numpy as np
 import pytest
 
-from nrrdvis import measure as nm
-from nrrdvis.phantom import (
+from voxelmetry import measure as nm
+from voxelmetry.phantom import (
     analytic_sphere_area_mm2,
     analytic_sphere_volume_mm3,
     sphere_phantom,
 )
-from nrrdvis.volume import Volume
+from voxelmetry.volume import Volume
 
 
 @pytest.mark.parametrize("radius", [10.0, 20.0, 30.0])
@@ -123,7 +123,7 @@ def test_components_are_measured_separately_largest_first():
     """Three spheres must report three diameters, not one spanning all of them."""
     array = np.zeros((60, 60, 60), dtype=np.uint8)
     volume = Volume(array, spacing=(1.0, 1.0, 1.0))
-    from nrrdvis.phantom import sphere_mask
+    from voxelmetry.phantom import sphere_mask
 
     for centre, radius in [((15, 15, 15), 8.0), ((45, 45, 45), 5.0), ((15, 45, 30), 3.0)]:
         array[sphere_mask(array.shape, centre, radius, volume.spacing)] = 2
@@ -261,7 +261,7 @@ def test_component_measurements_are_unchanged_by_the_bounding_box_crop():
     the origin, and forgetting that shift would silently report crop-local
     positions.
     """
-    from nrrdvis.phantom import sphere_mask
+    from voxelmetry.phantom import sphere_mask
 
     spacing = (2.5, 1.0, 1.0)
     shape = (60, 80, 80)

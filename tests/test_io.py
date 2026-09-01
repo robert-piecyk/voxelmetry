@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from nrrdvis import io as nio
-from nrrdvis.volume import Volume
+from voxelmetry import io as nio
+from voxelmetry.volume import Volume
 
 
 @pytest.mark.parametrize("suffix", [".nrrd", ".nii.gz", ".mha"])

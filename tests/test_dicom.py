@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from nrrdvis import io as nio
+from voxelmetry import io as nio
 
 pydicom = pytest.importorskip("pydicom", reason="DICOM support is an optional extra")
 

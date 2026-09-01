@@ -186,7 +186,7 @@ def load_dicom_seg(
         import pydicom
     except ImportError as exc:  # pragma: no cover - optional extra
         raise ImportError(
-            "Reading DICOM SEG needs pydicom. Install with: pip install 'nrrdvis[dicom]'"
+            "Reading DICOM SEG needs pydicom. Install with: pip install 'voxelmetry[dicom]'"
         ) from exc
 
     path = Path(path)
@@ -288,7 +288,7 @@ def dicom_seg_masks(path: str | Path) -> tuple[dict[int, np.ndarray], dict[int, 
 
     Returns:
         ``(masks, names, geometry)``: a boolean mask per segment number, the
-        segment names, and an all-zero :class:`~nrrdvis.volume.Volume` carrying
+        segment names, and an all-zero :class:`~voxelmetry.volume.Volume` carrying
         the shared spacing and origin, so a mask can be turned into a Volume
         with ``geometry.with_array(mask.astype(np.uint8))``.
     """

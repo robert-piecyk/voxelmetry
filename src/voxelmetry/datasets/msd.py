@@ -37,7 +37,7 @@ class Case:
     label_path: Path | None
 
     def load(self) -> tuple[Volume, Volume | None]:
-        """Load image and label as :class:`~nrrdvis.volume.Volume` objects."""
+        """Load image and label as :class:`~voxelmetry.volume.Volume` objects."""
         image = load(self.image_path, name=self.case_id)
         labels = load(self.label_path, name=f"{self.case_id}_labels") if self.label_path else None
         return image, labels

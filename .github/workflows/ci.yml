@@ -36,9 +36,9 @@ jobs:
         run: ruff check src tests
 
       - name: Test
-        run: pytest --cov=nrrdvis --cov-report=term-missing --cov-fail-under=90
+        run: pytest --cov=voxelmetry --cov-report=term-missing --cov-fail-under=90
 
       - name: Smoke-test the CLI end to end
         run: |
-          nrrdvis demo -o /tmp/demo.html
+          voxelmetry demo -o /tmp/demo.html
           test -s /tmp/demo.html

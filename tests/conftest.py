@@ -2,7 +2,7 @@
 
 import pytest
 
-from nrrdvis.phantom import sphere_phantom, torso_phantom
+from voxelmetry.phantom import sphere_phantom, torso_phantom
 
 
 @pytest.fixture(scope="session")

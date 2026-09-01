@@ -41,7 +41,7 @@ class Scene:
             a saved scene explains how it was produced.
     """
 
-    title: str = "nrrdvis"
+    title: str = "voxelmetry"
     meshes: list[Mesh] = field(default_factory=list)
     measurements: list[LabelMeasurement] = field(default_factory=list)
     subtitle: str = ""

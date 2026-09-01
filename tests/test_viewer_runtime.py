@@ -19,9 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from nrrdvis.phantom import TORSO_LABEL_NAMES
-from nrrdvis.viewer import html as nhtml
-from nrrdvis.viewer import scene_from_labelmap
+from voxelmetry.phantom import TORSO_LABEL_NAMES
+from voxelmetry.viewer import html as nhtml
+from voxelmetry.viewer import scene_from_labelmap
 
 HARNESS = Path(__file__).parent / "js" / "run_viewer.js"
 
@@ -60,7 +60,7 @@ def test_viewer_handles_a_single_structure(tmp_path):
     """A one-label scene is the common case and must not depend on having many."""
     import numpy as np
 
-    from nrrdvis.volume import Volume
+    from voxelmetry.volume import Volume
 
     array = np.zeros((30, 30, 30), dtype=np.uint8)
     array[8:22, 8:22, 8:22] = 1

@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from nrrdvis import preprocess as npre
-from nrrdvis.phantom import HU_AIR
-from nrrdvis.volume import Volume
+from voxelmetry import preprocess as npre
+from voxelmetry.phantom import HU_AIR
+from voxelmetry.volume import Volume
 
 
 def test_named_windows_resolve_to_bounds():

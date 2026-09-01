@@ -1,4 +1,6 @@
-# nrrd-vis
+# voxelmetry
+
+Physical-unit morphometry and a shareable 3-D viewer for medical segmentations.
 
 Reads medical image volumes, measures the structures in them in millimetres and
 litres, and writes an interactive 3-D viewer as a single HTML file. Works on any
@@ -17,7 +19,7 @@ largest holding 46%. `examples/render_views.py` produces these from the same
 meshes the viewer uses.
 
 ```bash
-nrrdvis view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
+voxelmetry view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
 ```
 
 ```
@@ -80,8 +82,8 @@ same command handles a liver study, a spleen study or a whole-body segmentation.
 ## Install
 
 ```bash
-git clone https://github.com/robert-piecyk/nrrd-vis
-cd nrrd-vis
+git clone https://github.com/robert-piecyk/voxelmetry
+cd voxelmetry
 pip install -e ".[all]"
 ```
 
@@ -94,17 +96,17 @@ The phantom generator makes a synthetic torso with an organ, lesions and bone,
 so this runs with no data:
 
 ```bash
-nrrdvis demo -o demo.html
+voxelmetry demo -o demo.html
 ```
 
 With real data:
 
 ```bash
-nrrdvis info scan.nii.gz
-nrrdvis measure segmentation.nii.gz --labels "1=liver,2=tumour" --split 2 --json out.json
-nrrdvis view segmentation.nii.gz -o scene.html --labels "1=liver,2=tumour" --split 2
-nrrdvis prep dicom_directory/ prepped.nrrd --window abdomen --isotropic 1.0
-nrrdvis convert dicom_directory/ volume.nrrd
+voxelmetry info scan.nii.gz
+voxelmetry measure segmentation.nii.gz --labels "1=liver,2=tumour" --split 2 --json out.json
+voxelmetry view segmentation.nii.gz -o scene.html --labels "1=liver,2=tumour" --split 2
+voxelmetry prep dicom_directory/ prepped.nrrd --window abdomen --isotropic 1.0
+voxelmetry convert dicom_directory/ volume.nrrd
 ```
 
 `--split` breaks a label into connected components, so multifocal disease is
@@ -129,7 +131,7 @@ Any NIfTI, NRRD, MetaImage or DICOM series works. The
 adapter that reads label names from `dataset.json`:
 
 ```python
-from nrrdvis.datasets import MSDDataset, download_command
+from voxelmetry.datasets import MSDDataset, download_command
 
 print(download_command("liver", "./data"))   # prints the curl+tar command
 dataset = MSDDataset("./data/Task03_Liver")
@@ -268,21 +270,21 @@ an interrupted scan over 131 large volumes keeps its work.
 ## Python API
 
 ```python
-import nrrdvis
-from nrrdvis.viewer import scene_from_labelmap, write
+import voxelmetry
+from voxelmetry.viewer import scene_from_labelmap, write
 
-image  = nrrdvis.load("scan.nii.gz")           # DICOM dir, NIfTI, NRRD, MetaImage
-labels = nrrdvis.load("segmentation.nii.gz")
+image  = voxelmetry.load("scan.nii.gz")           # DICOM dir, NIfTI, NRRD, MetaImage
+labels = voxelmetry.load("segmentation.nii.gz")
 
 image.spacing          # (5.0, 0.977, 0.977) mm, as (z, y, x)
 image.extent_mm        # physical field of view
 image.resample(1.0)    # isotropic; extent preserved, spacing updated
 
-liver   = nrrdvis.measure_label(labels, 1, "liver")
-tumours = nrrdvis.measure_components(labels, 2, "tumour", min_volume_mm3=50)
+liver   = voxelmetry.measure_label(labels, 1, "liver")
+tumours = voxelmetry.measure_components(labels, 2, "tumour", min_volume_mm3=50)
 
 print(f"{liver.volume_ml:.0f} mL, {len(tumours)} lesions")
-print(nrrdvis.lesion_burden(tumours, reference_volume_ml=liver.volume_ml))
+print(voxelmetry.lesion_burden(tumours, reference_volume_ml=liver.volume_ml))
 
 scene = scene_from_labelmap(
     labels,
@@ -296,7 +298,7 @@ write(scene, "scene.html")
 Preprocessing is declarative, so a run can be recorded next to its output:
 
 ```python
-from nrrdvis.preprocess import PreprocessConfig, run
+from voxelmetry.preprocess import PreprocessConfig, run
 
 config = PreprocessConfig(window="abdomen", isotropic_mm=1.0, denoise_mm=0.0)
 print(config.describe())
@@ -338,7 +340,7 @@ segmentations. Producing them is the next piece of work.
 ## Layout
 
 ```
-src/nrrdvis/
+src/voxelmetry/
 ├── volume.py        Volume: array + spacing + origin, geometry-preserving ops
 ├── io.py            DICOM series, DICOM SEG, NIfTI, NRRD; the (x,y,z)/(z,y,x) flip
 ├── preprocess.py    HU windowing, body extraction, denoising, declarative config

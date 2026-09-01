@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from nrrdvis import mesh as nmesh
-from nrrdvis.phantom import analytic_sphere_volume_mm3, sphere_phantom
+from voxelmetry import mesh as nmesh
+from voxelmetry.phantom import analytic_sphere_volume_mm3, sphere_phantom
 
 
 def test_extracted_mesh_encloses_the_analytic_volume(sphere):
@@ -33,7 +33,7 @@ def test_vertices_are_xyz_ordered(sphere):
     _, labels = sphere
     array = np.zeros((60, 30, 15), dtype=np.uint8)
     array[5:55, 5:25, 5:10] = 1
-    from nrrdvis.volume import Volume
+    from voxelmetry.volume import Volume
 
     mesh = nmesh.surface_from_label(Volume(array, spacing=(1.0, 1.0, 1.0)), 1)
     lo, hi = mesh.bounds
@@ -135,7 +135,7 @@ def test_cluster_fallback_respects_the_budget(sphere, target):
 
 def test_cluster_fallback_keeps_the_shape_recognisable(sphere):
     """Cruder than quadric decimation, but it must not distort the geometry."""
-    from nrrdvis.phantom import analytic_sphere_volume_mm3
+    from voxelmetry.phantom import analytic_sphere_volume_mm3
 
     _, labels = sphere
     mesh = nmesh.surface_from_label(labels, 1)
@@ -198,7 +198,7 @@ def test_decimate_falls_back_when_the_fast_backend_is_absent(monkeypatch, sphere
     assert 0 < reduced.n_faces <= 4000
     assert reduced.name == mesh.name and reduced.color == mesh.color
 
-    from nrrdvis.phantom import analytic_sphere_volume_mm3
+    from voxelmetry.phantom import analytic_sphere_volume_mm3
 
     assert nmesh.mesh_volume_mm3(reduced) == pytest.approx(
         analytic_sphere_volume_mm3(30.0), rel=0.05

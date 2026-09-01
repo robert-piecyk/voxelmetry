@@ -5,9 +5,9 @@ import json
 import numpy as np
 import pytest
 
-from nrrdvis import io as nio
-from nrrdvis.datasets import MSD_TASKS, MSDDataset, download_command
-from nrrdvis.volume import Volume
+from voxelmetry import io as nio
+from voxelmetry.datasets import MSD_TASKS, MSDDataset, download_command
+from voxelmetry.volume import Volume
 
 
 @pytest.fixture
