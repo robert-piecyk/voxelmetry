@@ -1,4 +1,4 @@
-"""voxelmetry: morphometry for CT and MR segmentations, with a 3-D viewer that fits in one HTML file."""
+"""Morphometry for CT and MR segmentations, with a 3-D viewer that fits in one HTML file."""
 
 from .io import dicom_seg_masks, load, load_dicom_seg, load_dicom_series, save
 from .measure import (
