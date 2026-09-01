@@ -31,7 +31,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check the pages we are about to publish
         run: |
@@ -48,11 +48,14 @@ jobs:
           done
           exit $missing
 
-      - uses: actions/configure-pages@v5
+      # No `enablement: true` here on purpose: that input needs a PAT with repo
+      # scope stored as a secret, which is more setup than enabling Pages once
+      # under Settings -> Pages -> Source: GitHub Actions.
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
