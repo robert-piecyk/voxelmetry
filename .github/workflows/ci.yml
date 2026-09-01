@@ -36,7 +36,7 @@ jobs:
         run: ruff check src tests
 
       - name: Test
-        run: pytest --cov=nrrdvis --cov-report=term-missing
+        run: pytest --cov=nrrdvis --cov-report=term-missing --cov-fail-under=90
 
       - name: Smoke-test the CLI end to end
         run: |

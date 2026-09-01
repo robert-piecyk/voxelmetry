@@ -94,16 +94,30 @@ def test_payload_roundtrips_through_base64(sphere):
 
 
 def test_binary_payload_beats_json_numbers_on_size(sphere):
-    """The reason v1's output was 18 MB: numbers serialised as decimal text."""
+    """Base64 geometry is smaller than JSON number lists.
+
+    The saving comes from the vertices. A float32 coordinate costs 5.33 base64
+    characters but serialises as a ~19-character decimal string. Face indices
+    are small integers that are already compact in decimal, so they barely
+    compress, and the overall ratio therefore depends on the vertex-to-face mix
+    of the particular mesh. The vertex ratio is the stable claim; the overall
+    figure is asserted with enough margin to hold on either decimation path.
+    """
     import json
 
     _, labels = sphere
     mesh = nmesh.decimate(nmesh.surface_from_label(labels, 1), 4000)
-    binary = len(json.dumps(mesh.to_payload()))
+    payload = mesh.to_payload()
+
+    vertices_binary = len(json.dumps(payload["vertices"]))
+    vertices_json = len(json.dumps(mesh.vertices.tolist()))
+    assert vertices_json > vertices_binary * 2.5
+
+    binary = len(json.dumps(payload))
     as_numbers = len(json.dumps({
         "vertices": mesh.vertices.tolist(), "faces": mesh.faces.tolist(),
     }))
-    assert binary < as_numbers / 2
+    assert binary < as_numbers * 0.60
 
 
 @pytest.mark.parametrize("target", [8000, 2000, 500])
@@ -156,3 +170,36 @@ def test_isosurface_reports_which_sigma_it_used():
 def test_isosurface_of_an_empty_mask_is_empty():
     verts, faces, used = nmesh.isosurface(np.zeros((10, 10, 10), dtype=bool), (1.0, 1.0, 1.0))
     assert len(verts) == 0 and len(faces) == 0 and used == 0.0
+
+
+def test_decimate_falls_back_when_the_fast_backend_is_absent(monkeypatch, sphere):
+    """Cover the path an install without the mesh extra actually takes.
+
+    trimesh dispatches quadric decimation to fast-simplification. When that is
+    missing, decimate() drops to vertex clustering and steps the grid coarser
+    until it is under budget. This divergence between a developer machine and a
+    bare CI install once produced a green local suite and a red pipeline.
+    """
+    import builtins
+
+    real_import = builtins.__import__
+
+    def without_trimesh(name, *args, **kwargs):
+        if name == "trimesh":
+            raise ImportError("simulated: mesh extra not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_trimesh)
+
+    _, labels = sphere
+    mesh = nmesh.surface_from_label(labels, 1)
+    reduced = nmesh.decimate(mesh, 4000)
+
+    assert 0 < reduced.n_faces <= 4000
+    assert reduced.name == mesh.name and reduced.color == mesh.color
+
+    from nrrdvis.phantom import analytic_sphere_volume_mm3
+
+    assert nmesh.mesh_volume_mm3(reduced) == pytest.approx(
+        analytic_sphere_volume_mm3(30.0), rel=0.05
+    )

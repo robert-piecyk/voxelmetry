@@ -198,7 +198,7 @@ uncorrected artifact, so a regression in the fix shows up rather than passing
 quietly.
 
 ```bash
-pytest              # 138 tests, including 39 headless checks on the generated viewer
+pytest              # 164 tests, including 39 headless checks on the generated viewer
 ruff check src tests examples
 ```
 
