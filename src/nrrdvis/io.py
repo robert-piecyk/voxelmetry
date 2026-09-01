@@ -10,6 +10,8 @@ exactly one place.
 
 from __future__ import annotations
 
+import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -144,3 +146,184 @@ def is_volume_file(path: str | Path) -> bool:
     path = Path(path)
     name = path.name.lower()
     return name.endswith(".nii.gz") or path.suffix.lower() in _VOLUME_SUFFIXES
+
+
+def load_dicom_seg(
+    path: str | Path,
+    name: str | None = None,
+    priority: Sequence[int] | None = None,
+) -> tuple[Volume, dict[int, str]]:
+    """Read a DICOM Segmentation object into a label map and its segment names.
+
+    DICOM SEG is how segmentations travel between clinical systems, and it is
+    not a volume: it is a multi-frame object where each frame carries one
+    segment on one slice, present only where that segment is non-empty. The
+    frames must be reassembled against their patient positions to become a
+    grid, which is what this does.
+
+    Overlap is the one place a choice has to be made. DICOM SEG permits
+    segments to overlap -- a tumour inside a liver is stored in both -- while
+    an integer label map cannot represent that. Segments are written in
+    ``priority`` order, later ones winning, which suits the usual authoring
+    order of organ first and structures inside it after.
+
+    That flattening can badly misrepresent a heavily overlapping SEG, so it is
+    never silent: if any voxel is claimed by more than one segment, a warning
+    names the segments and how much each lost. A real Colorectal-Liver-
+    Metastases SEG carries both "Liver" and "Liver Remnant" over largely the
+    same voxels, and flattening leaves "Liver" as 767 disconnected fragments.
+    Use :func:`dicom_seg_masks` when segments genuinely overlap.
+
+    Args:
+        path: The ``.dcm`` SEG file, or a directory holding exactly one.
+        name: Label for the result. Defaults to the file stem.
+        priority: Segment numbers in increasing precedence. Defaults to
+            ascending numeric order.
+
+    Returns:
+        ``(labelmap, names)`` where ``labelmap`` holds one integer per segment
+        and ``names`` maps those integers to their ``SegmentLabel``.
+
+    Raises:
+        ImportError: If pydicom is not installed.
+        ValueError: If the file is not a Segmentation object, or a directory
+            does not hold exactly one candidate.
+    """
+    try:
+        import pydicom
+    except ImportError as exc:  # pragma: no cover - optional extra
+        raise ImportError(
+            "Reading DICOM SEG needs pydicom. Install with: pip install 'nrrdvis[dicom]'"
+        ) from exc
+
+    path = Path(path)
+    if path.is_dir():
+        candidates = [p for p in sorted(path.iterdir()) if p.suffix.lower() == ".dcm"]
+        if len(candidates) != 1:
+            raise ValueError(
+                f"Expected exactly one .dcm SEG file in {path}, found {len(candidates)}"
+            )
+        path = candidates[0]
+
+    ds = pydicom.dcmread(path)
+    if getattr(ds, "Modality", None) != "SEG":
+        raise ValueError(f"{path} is not a DICOM Segmentation object (Modality={ds.Modality!r})")
+
+    shared = ds.SharedFunctionalGroupsSequence[0]
+    measures = shared.PixelMeasuresSequence[0]
+    row_mm, col_mm = (float(v) for v in measures.PixelSpacing)
+    slice_mm = float(
+        getattr(measures, "SpacingBetweenSlices", None) or measures.SliceThickness
+    )
+
+    frames = ds.PerFrameFunctionalGroupsSequence
+    positions = [
+        float(frame.PlanePositionSequence[0].ImagePositionPatient[2]) for frame in frames
+    ]
+    segment_numbers = [
+        int(frame.SegmentIdentificationSequence[0].ReferencedSegmentNumber) for frame in frames
+    ]
+
+    # Only slices where some segment is present appear in the file, so the grid
+    # is built from the positions actually observed.
+    z_values = sorted(set(positions))
+    z_index = {z: i for i, z in enumerate(z_values)}
+
+    pixels = ds.pixel_array
+    if pixels.ndim == 2:  # a single-frame SEG
+        pixels = pixels[np.newaxis]
+
+    names = {
+        int(segment.SegmentNumber): str(segment.SegmentLabel)
+        for segment in ds.SegmentSequence
+    }
+
+    rank = (
+        {segment: i for i, segment in enumerate(priority)}
+        if priority is not None
+        else {segment: segment for segment in names}
+    )
+
+    shape = (len(z_values), int(ds.Rows), int(ds.Columns))
+    labelmap = np.zeros(shape, dtype=np.uint8)
+    claims = np.zeros(shape, dtype=np.uint8)  # how many segments cover each voxel
+    lost: dict[int, int] = {}
+
+    order = sorted(range(len(frames)), key=lambda i: rank.get(segment_numbers[i], 0))
+    for frame_index in order:
+        segment = segment_numbers[frame_index]
+        z = z_index[positions[frame_index]]
+        mask = pixels[frame_index].astype(bool)
+
+        overwritten = labelmap[z][mask]
+        for previous in np.unique(overwritten[overwritten != 0]):
+            lost[int(previous)] = lost.get(int(previous), 0) + int((overwritten == previous).sum())
+
+        claims[z][mask] += 1
+        labelmap[z][mask] = segment
+
+    if lost:
+        overlapping = (claims > 1).sum()
+        detail = ", ".join(
+            f"{names.get(seg, seg)!r} lost {count} voxels"
+            for seg, count in sorted(lost.items(), key=lambda kv: -kv[1])
+        )
+        warnings.warn(
+            f"{path.name}: segments overlap on {overlapping} voxels and cannot all be "
+            f"kept in one label map ({detail}). Use load_dicom_seg(..., priority=...) "
+            "to choose which wins, or dicom_seg_masks() to keep them separate.",
+            stacklevel=2,
+        )
+
+    volume = Volume(
+        array=labelmap,
+        spacing=(slice_mm, row_mm, col_mm),
+        origin=(z_values[0], 0.0, 0.0),
+        name=name or path.stem,
+    )
+    return volume, names
+
+
+def dicom_seg_masks(path: str | Path) -> tuple[dict[int, np.ndarray], dict[int, str], Volume]:
+    """Read a DICOM SEG keeping every segment as its own binary mask.
+
+    The lossless counterpart to :func:`load_dicom_seg`. Use it when segments
+    genuinely overlap and flattening would destroy one of them.
+
+    Args:
+        path: The ``.dcm`` SEG file, or a directory holding exactly one.
+
+    Returns:
+        ``(masks, names, geometry)``: a boolean mask per segment number, the
+        segment names, and an all-zero :class:`~nrrdvis.volume.Volume` carrying
+        the shared spacing and origin, so a mask can be turned into a Volume
+        with ``geometry.with_array(mask.astype(np.uint8))``.
+    """
+    with warnings.catch_warnings():
+        # The flattening warning is irrelevant here: nothing is being flattened.
+        warnings.simplefilter("ignore")
+        labelmap, names = load_dicom_seg(path)
+
+    import pydicom
+
+    path = Path(path)
+    if path.is_dir():
+        path = next(p for p in sorted(path.iterdir()) if p.suffix.lower() == ".dcm")
+    ds = pydicom.dcmread(path)
+
+    frames = ds.PerFrameFunctionalGroupsSequence
+    positions = [
+        float(frame.PlanePositionSequence[0].ImagePositionPatient[2]) for frame in frames
+    ]
+    z_index = {z: i for i, z in enumerate(sorted(set(positions)))}
+    pixels = ds.pixel_array
+    if pixels.ndim == 2:  # pragma: no cover - single-frame SEG
+        pixels = pixels[np.newaxis]
+
+    masks = {segment: np.zeros(labelmap.shape, dtype=bool) for segment in names}
+    for frame_index, frame in enumerate(frames):
+        segment = int(frame.SegmentIdentificationSequence[0].ReferencedSegmentNumber)
+        z = z_index[positions[frame_index]]
+        masks[segment][z] |= pixels[frame_index].astype(bool)
+
+    return masks, names, labelmap.with_array(np.zeros(labelmap.shape, dtype=np.uint8))

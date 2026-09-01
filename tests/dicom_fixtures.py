@@ -100,3 +100,108 @@ def write_ct_series(
         pydicom.dcmwrite(directory / name, ds, enforce_file_format=True)
 
     return directory
+
+
+SEG_STORAGE = "1.2.840.10008.5.1.4.1.1.66.4"
+
+
+def write_seg(
+    path: Path,
+    masks: dict[int, np.ndarray],
+    labels: dict[int, str],
+    spacing: tuple[float, float, float] = (5.0, 0.9, 0.9),
+    origin_z: float = -450.0,
+) -> Path:
+    """Write binary masks as a multi-frame DICOM Segmentation object.
+
+    Mirrors how a real SEG is laid out: one frame per (segment, slice) pair,
+    written only where that segment is non-empty, with the segment number and
+    patient position carried in the per-frame functional groups.
+
+    Args:
+        path: Destination ``.dcm`` file.
+        masks: Boolean array per segment number, all the same shape ``[z,y,x]``.
+        labels: Segment number to name.
+        spacing: Millimetres per voxel, ``(z, y, x)``.
+        origin_z: Patient-space z of slice 0.
+
+    Returns:
+        The path written to.
+    """
+    import pydicom
+    from pydicom.dataset import Dataset, FileMetaDataset
+    from pydicom.uid import ExplicitVRLittleEndian, generate_uid
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    any_mask = next(iter(masks.values()))
+    n_z, rows, cols = any_mask.shape
+
+    ds = Dataset()
+    ds.file_meta = FileMetaDataset()
+    ds.file_meta.MediaStorageSOPClassUID = SEG_STORAGE
+    ds.file_meta.MediaStorageSOPInstanceUID = generate_uid()
+    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds.file_meta.ImplementationClassUID = generate_uid()
+
+    ds.SOPClassUID = SEG_STORAGE
+    ds.SOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID
+    ds.StudyInstanceUID = generate_uid()
+    ds.SeriesInstanceUID = generate_uid()
+    ds.Modality = "SEG"
+    ds.PatientName = "Phantom^Synthetic"
+    ds.PatientID = "PHANTOM"
+    ds.SeriesNumber = 1
+    ds.Rows, ds.Columns = int(rows), int(cols)
+    ds.SegmentationType = "BINARY"
+    ds.BitsAllocated = 1
+    ds.BitsStored = 1
+    ds.HighBit = 0
+    ds.SamplesPerPixel = 1
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.PixelRepresentation = 0
+
+    segment_sequence = []
+    for number in sorted(masks):
+        segment = Dataset()
+        segment.SegmentNumber = int(number)
+        segment.SegmentLabel = labels.get(number, f"Segment {number}")
+        segment.SegmentAlgorithmType = "MANUAL"
+        segment_sequence.append(segment)
+    ds.SegmentSequence = segment_sequence
+
+    measures = Dataset()
+    measures.PixelSpacing = [float(spacing[1]), float(spacing[2])]
+    measures.SliceThickness = float(spacing[0])
+    measures.SpacingBetweenSlices = float(spacing[0])
+    orientation = Dataset()
+    orientation.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    shared = Dataset()
+    shared.PixelMeasuresSequence = [measures]
+    shared.PlaneOrientationSequence = [orientation]
+    ds.SharedFunctionalGroupsSequence = [shared]
+
+    per_frame, planes = [], []
+    for number in sorted(masks):
+        mask = masks[number]
+        for z in range(n_z):
+            if not mask[z].any():
+                continue  # a real SEG omits empty frames, which is the point
+            frame = Dataset()
+            identification = Dataset()
+            identification.ReferencedSegmentNumber = int(number)
+            position = Dataset()
+            position.ImagePositionPatient = [0.0, 0.0, origin_z + z * spacing[0]]
+            frame.SegmentIdentificationSequence = [identification]
+            frame.PlanePositionSequence = [position]
+            per_frame.append(frame)
+            planes.append(mask[z])
+
+    ds.PerFrameFunctionalGroupsSequence = per_frame
+    ds.NumberOfFrames = len(per_frame)
+    ds.PixelData = np.packbits(
+        np.stack(planes).astype(np.uint8), axis=None, bitorder="little"
+    ).tobytes()
+
+    pydicom.dcmwrite(path, ds, enforce_file_format=True)
+    return path
