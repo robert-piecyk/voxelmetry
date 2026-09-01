@@ -1,0 +1,58 @@
+name: Pages
+
+# Publishes docs/ to GitHub Pages. docs/index.html is the field guide and
+# references its images relatively, so the directory is served as-is with no
+# build step.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it, so the live site is
+# never left half-updated.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the pages we are about to publish
+        run: |
+          test -f docs/index.html
+          # Every relative asset the page references must exist, or the site
+          # deploys with broken images and nothing fails.
+          missing=0
+          for asset in $(grep -oE 'src="[^"#:]+\.(png|jpg|svg)"' docs/index.html \
+                         | sed 's/src="//; s/"//'); do
+            if [ ! -f "docs/$asset" ]; then
+              echo "missing asset: docs/$asset"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -6,9 +6,10 @@ Reads medical image volumes, measures the structures in them in millimetres and
 litres, and writes an interactive 3-D viewer as a single HTML file. Works on any
 integer-labelled segmentation — CT or MR, one structure or thirty.
 
-[`docs/tutorial.html`](docs/tutorial.html) is the field guide: loading,
-measuring, viewing, and the traps that show up on real scans. Open it in a
-browser or serve `docs/`.
+The field guide — loading, measuring, viewing, and the traps that show up on
+real scans — is at
+[robert-piecyk.github.io/voxelmetry](https://robert-piecyk.github.io/voxelmetry/),
+or [`docs/index.html`](docs/index.html) in this repo.
 
 ![Liver, hepatic and portal vein trees and five metastases, shown solid, with the liver at 16% opacity, and with the liver hidden](docs/hepatic_montage.png)
 
