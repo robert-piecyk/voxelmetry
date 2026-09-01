@@ -79,10 +79,8 @@ def scene_from_labelmap(
 ) -> Scene:
     """Build a complete scene from any integer-labelled segmentation.
 
-    Nothing here knows about livers. It takes whatever labels are present,
-    extracts a surface per label, measures each, and assigns colours in order.
-    The same call renders a liver study, a spleen study or a multi-organ
-    segmentation with dozens of structures.
+    Takes whatever labels are present, extracts a surface per label, measures
+    each and assigns colours in order. Nothing is organ-specific.
 
     Args:
         labelmap: Integer-valued segmentation volume.

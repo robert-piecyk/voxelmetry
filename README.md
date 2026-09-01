@@ -1,44 +1,28 @@
 # nrrd-vis
 
-Spacing-aware 3-D medical volume processing, morphometry and an interactive
-viewer that fits in a browser tab.
+Reads medical image volumes, measures the structures in them in millimetres and
+litres, and writes an interactive 3-D viewer as a single HTML file. Works on any
+integer-labelled segmentation — CT or MR, one structure or thirty.
 
-Point it at any labelled segmentation — CT or MR, one structure or thirty — and
-it measures every label in physical units and writes a self-contained HTML page
-you can open, share or host.
-
-**[Field guide →](https://claude.ai/code/artifact/80b90f0e-7428-4d63-a7bb-de809e1d3c5a)** — the
-hands-on tutorial: loading, measuring, viewing, and the five traps that bite on real scans. Also in
-this repo as [`docs/tutorial.html`](docs/tutorial.html).
-
-Two live demos, both built from real public data by the commands below:
-
-- **[Liver Morphometry Viewer](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)**
-  — MSD Task03 case `liver_108`: 57 tumours at 43% hepatic burden.
-- **[Hepatic Segmentation Viewer](https://claude.ai/code/artifact/74d55290-1449-4e58-bb86-f1ce26e77257)**
-  — a clinical **DICOM SEG** from TCIA Colorectal-Liver-Metastases: liver, the
-  hepatic and portal vein trees, and five metastases.
-
-Drag to orbit, drop the opacity to see structures inside the organ, or cut
-through with the clip plane.
+[Field guide](https://claude.ai/code/artifact/80b90f0e-7428-4d63-a7bb-de809e1d3c5a)
+is the tutorial; a copy lives in [`docs/tutorial.html`](docs/tutorial.html).
+Two viewers built from public data with the commands below:
+[MSD liver_108](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)
+(57 tumours, 43% hepatic burden) and
+[a clinical DICOM SEG](https://claude.ai/code/artifact/74d55290-1449-4e58-bb86-f1ce26e77257)
+(liver, both vein trees, five metastases).
 
 ![Liver, hepatic and portal vein trees and five metastases, shown solid, with the liver at 16% opacity, and with the liver hidden](docs/hepatic_montage.png)
 
-*The same scene at three opacity settings, straight from a clinical DICOM SEG.
-The disconnected vessel stubs are not noise: at 0.887 mm in-plane against 5 mm
-between slices, a vessel a few millimetres across is sampled as isolated
-cross-sections. The measurements say the same thing — the hepatic vein reports
-150 components with the largest holding 46%.*
-
-These are rendered by `examples/render_views.py`, which draws the same meshes
-the viewer draws through the same scene assembly, so the pictures cannot drift
-from the tool.
+The vessel stubs in the middle and right panels are not a rendering fault. At
+0.887 mm in-plane against 5 mm between slices, a 3 mm vessel is sampled as
+isolated cross-sections; the hepatic vein measures 150 components with the
+largest holding 46%. `examples/render_views.py` produces these from the same
+meshes the viewer uses.
 
 ```bash
 nrrdvis view liver_0.nii.gz -o liver.html --labels "1=liver,2=tumour" --split 2 --min-volume 100
 ```
-
-Real output, MSD Task03 Liver case `liver_0`:
 
 ```
 wrote liver.html  (12 structures, 65,532 triangles, 1,569 KB)
@@ -60,46 +44,42 @@ tumour_11 *         0.11         5.5            1.2       0.923      1
 * spans under 5 voxels on its thinnest axis; shape figures are indicative only
 ```
 
-Two things in that table are the point of the rewrite. The liver reports
-`parts = 2`, so the segmentation is not one connected region. And every lesion
-is flagged: at this scan's 5 mm slice thickness a 6 mm lesion spans barely more
-than one slice, so its volume and diameter are usable but its shape is not.
-Neither fact is visible from a rendering alone.
+That output is from MSD Task03 case `liver_0`. Note `parts = 2` on the liver:
+the segmentation is not one connected region. Every lesion is flagged because
+at 5 mm slice thickness a 6 mm lesion spans barely more than one slice, so its
+volume and diameter hold but its shape does not. Neither fact shows up in a
+rendering.
 
 ---
 
 ## Contents
 
-- [What this is](#what-this-is)
+- [Background](#background)
 - [Install](#install)
 - [Quickstart](#quickstart)
 - [The viewer](#the-viewer)
 - [Measurements](#measurements)
-- [How it is validated](#how-it-is-validated)
+- [Validation](#validation)
 - [Modalities](#modalities)
-- [What 131 livers looked like](#what-131-livers-looked-like)
+- [Cohort scan](#cohort-scan)
 - [Python API](#python-api)
-- [What changed from v1](#what-changed-from-v1)
+- [Changes from v1](#changes-from-v1)
 - [Layout](#layout)
 
 ---
 
-## What this is
+## Background
 
-This began as a 2020 master's project on liver and tumour segmentation from
-abdominal CT: preprocess DICOM, segment, stack slices into NRRD, render a 3-D
-surface, measure it. That code is preserved in [`legacy/`](legacy/) and the
-[notes there](legacy/README.md) describe what each script contributed.
+Started as a 2020 master's project on liver and tumour segmentation from
+abdominal CT: preprocess DICOM, segment, stack slices into NRRD, render a
+surface, measure it. Those scripts are kept in [`legacy/`](legacy/), with
+[notes](legacy/README.md) on what each contributed.
 
-v2 is a rewrite around one idea the original was missing: **a volume is not an
-array — it is an array plus the physical geometry needed to interpret it.**
-Every measurement here is in millimetres and litres because spacing is carried
-through resampling, cropping and meshing rather than being tracked separately
-and quietly invalidated.
-
-The second idea is that **none of it should know what a liver is**. The
-pipeline takes whatever integer labels it finds, so the same command renders a
-liver study, a spleen study or a whole-body multi-organ segmentation.
+v2 keeps spacing attached to the voxels. A `Volume` carries its millimetres per
+voxel through resampling, cropping and meshing, so measurements stay in
+physical units instead of drifting whenever the grid changes. Nothing in the
+pipeline is organ-specific; it takes whatever integer labels are present, so the
+same command handles a liver study, a spleen study or a whole-body segmentation.
 
 ## Install
 
@@ -109,13 +89,13 @@ cd nrrd-vis
 pip install -e ".[all]"
 ```
 
-Python 3.10+. The core needs numpy, scipy, scikit-image and SimpleITK; DICOM
-reading and mesh decimation are optional extras.
+Python 3.10+. Core dependencies are numpy, scipy, scikit-image and SimpleITK.
+DICOM reading and quadric mesh decimation are optional extras.
 
 ## Quickstart
 
-No data needed — the phantom generator produces a synthetic torso with an
-organ, lesions and bone:
+The phantom generator makes a synthetic torso with an organ, lesions and bone,
+so this runs with no data:
 
 ```bash
 nrrdvis demo -o demo.html
@@ -124,24 +104,15 @@ nrrdvis demo -o demo.html
 With real data:
 
 ```bash
-# What am I looking at?
 nrrdvis info scan.nii.gz
-
-# Measure every label
 nrrdvis measure segmentation.nii.gz --labels "1=liver,2=tumour" --split 2 --json out.json
-
-# Build the viewer
 nrrdvis view segmentation.nii.gz -o scene.html --labels "1=liver,2=tumour" --split 2
-
-# Preprocess a raw CT series
 nrrdvis prep dicom_directory/ prepped.nrrd --window abdomen --isotropic 1.0
-
-# Convert formats, keeping spacing and origin
 nrrdvis convert dicom_directory/ volume.nrrd
 ```
 
-`--split` breaks a label into connected components so multifocal disease is
-measured lesion by lesion instead of as one blob.
+`--split` breaks a label into connected components, so multifocal disease is
+measured lesion by lesion rather than as one blob.
 
 ### Formats
 
@@ -152,67 +123,62 @@ measured lesion by lesion instead of as one blob.
 | DICOM SEG | `load_dicom_seg()` for a label map, `dicom_seg_masks()` when segments overlap |
 
 CT is assumed to be in Hounsfield units. MR and other uncalibrated data are
-detected, and the parts of preprocessing that need an absolute scale either
-adapt or refuse — see [Modalities](#modalities).
+detected, and preprocessing steps that need an absolute scale either adapt or
+refuse. See [Modalities](#modalities).
 
 ### Getting a dataset
 
 Any NIfTI, NRRD, MetaImage or DICOM series works. The
-[Medical Segmentation Decathlon](http://medicaldecathlon.com/) tasks are a good
-starting point and have a built-in adapter:
+[Medical Segmentation Decathlon](http://medicaldecathlon.com/) tasks have an
+adapter that reads label names from `dataset.json`:
 
 ```python
 from nrrdvis.datasets import MSDDataset, download_command
 
 print(download_command("liver", "./data"))   # prints the curl+tar command
-dataset = MSDDataset("./data/Task03_Liver")  # labels read from dataset.json
+dataset = MSDDataset("./data/Task03_Liver")
 image, labels = dataset.cases[0].load()
 ```
 
 ## The viewer
 
-Output is one HTML file with a single external dependency (three.js from a
-pinned CDN). Geometry is embedded as base64 binary and decoded into typed
-arrays in the browser.
+Output is one HTML file with a single external dependency, three.js from a
+pinned CDN. Geometry is base64 binary, decoded into typed arrays in the browser.
 
-- Drag to orbit, scroll to zoom, shift-drag to pan
-- Per-structure visibility, with volumes in the sidebar
-- Global opacity, so lesions can be seen through the organ containing them
-- A clip plane on any anatomical axis, for cutting into the volume
-- A scale bar in millimetres that tracks the camera
-- Measurements and acquisition geometry alongside the render
-- Light and dark themes, and a layout that works on a phone
+Drag to orbit, scroll to zoom, shift-drag to pan. The sidebar toggles structures
+and shows their volumes; a global opacity slider makes lesions visible through
+the organ containing them, and a clip plane cuts along any anatomical axis. A
+scale bar tracks the camera. Light and dark themes both work, as does a phone.
 
-Size is bounded by a per-structure triangle budget (`--max-faces`), so output
+A per-structure triangle budget (`--max-faces`) bounds the output size, so it
 stays in the hundreds of kilobytes rather than growing with scan resolution.
 
 ## Measurements
 
-For every label, and optionally for every connected component within a label:
+Per label, and optionally per connected component within a label:
 
 | Quantity | Notes |
 |---|---|
 | Volume (mm³ and mL) | Voxel count times true voxel volume |
-| Max diameter | True 3-D Feret diameter over the convex hull, not a per-slice approximation |
+| Max diameter | 3-D Feret diameter, exact over the convex hull |
 | Surface area | Marching-cubes triangulation, calibrated against analytic spheres |
 | Sphericity | Equivalent-sphere area over measured area; 1.0 is a sphere |
 | Centroid, bounding box | Millimetres, in patient coordinates |
-| Component count | Plus the fraction held by the largest, which flags fragmented predictions |
+| Component count | With the fraction held by the largest, which flags fragmented predictions |
 
-Structures spanning fewer than five voxels on their thinnest axis are marked
-`resolution_limited`. Their volume and diameter remain usable; their shape
-descriptors are dominated by sampling artifacts and are reported as indicative
-only rather than silently presented as fact.
+Structures spanning fewer than five voxels on their thinnest axis get
+`resolution_limited`. Volume and diameter stay usable; shape descriptors at that
+size are dominated by sampling artifacts, so they are reported as indicative
+rather than presented as fact.
 
-`lesion_burden()` aggregates components into the figures a report wants: lesion
-count, total and largest volume, largest diameter, and the sum of diameters
-that RECIST tracks between timepoints.
+`lesion_burden()` aggregates components into lesion count, total and largest
+volume, largest diameter, and the sum of diameters that RECIST tracks between
+timepoints.
 
-## How it is validated
+## Validation
 
-Measurement code that is only checked against itself will happily be
-self-consistently wrong. The phantom generator emits shapes whose geometry is
-known in closed form, and the tests assert against that arithmetic:
+The phantom generator emits shapes with closed-form geometry, and the tests
+assert against that arithmetic rather than against the code's own output:
 
 | Property | Result |
 |---|---|
@@ -225,41 +191,39 @@ known in closed form, and the tests assert against that arithmetic:
 | Mesh-enclosed volume vs voxel count | within 0.5% |
 | Volume after 20 Taubin smoothing passes | within 0.5% of unsmoothed |
 
-That last row is the reason smoothing is Taubin rather than Laplacian:
-Laplacian smoothing contracts a closed surface a little on every iteration, so
-volume measured off a smoothed mesh drifts steadily downward.
+The last row is why smoothing is Taubin and not Laplacian. Laplacian smoothing
+contracts a closed surface slightly on every iteration, so volume measured off a
+smoothed mesh drifts downward.
 
-The surface-area calibration is worth stating explicitly. Marching cubes on a
-hard binary mask traces a staircase and overestimates area by about 9%. A
-Gaussian pre-smooth of 0.8 voxels holds the error under 1% across the radii
-tested; the tests pin both the corrected value *and* the uncorrected artifact,
-so a regression in the fix is visible rather than silent.
+Marching cubes on a hard binary mask traces a staircase and overestimates
+surface area by about 9%. A Gaussian pre-smooth of 0.8 voxels holds the error
+under 1% across the radii tested. The tests pin the corrected value and the
+uncorrected artifact, so a regression in the fix shows up rather than passing
+quietly.
 
 ```bash
 pytest              # 138 tests, including 39 headless checks on the generated viewer
-ruff check src tests
+ruff check src tests examples
 ```
 
 ## Modalities
 
-Preprocessing was written for CT, where Hounsfield units are calibrated so air
-sits near −1000. Nothing else shares that scale, and the failures were silent
-until they were checked against a real liver MR from TCGA-LIHC (intensities 0
-to 831):
+Preprocessing was written for CT, where Hounsfield units put air near −1000.
+Nothing else shares that scale. Both failures below were silent until they were
+run against a liver MR from TCGA-LIHC with intensities 0 to 831:
 
 | Operation | On non-HU data before | Now |
 |---|---|---|
-| `body_mask` | Selected **87%** of the field of view — every voxel is "above −320 HU" | Detects uncalibrated data, falls back to an Otsu threshold: **37.9%** |
+| `body_mask` | Selected 87% of the field of view, since every voxel is above −320 HU | Detects uncalibrated data and falls back to Otsu: 37.9% |
 | `apply_window("abdomen")` | Clipped to [−160, 240], collapsing everything above 240 into one value | Raises, and points at `window="percentile"` |
 
-`is_hounsfield()` is the check; `percentile_window()` is the alternative for
-data with no absolute scale. CT behaviour is unchanged and pinned by a test.
+`is_hounsfield()` is the check, `percentile_window()` the alternative for data
+with no absolute scale. CT behaviour is unchanged and pinned by a test.
 
-## What 131 livers looked like
+## Cohort scan
 
 `examples/cohort_report.py` measures every case in a dataset in parallel and
-reports what disagrees with the cohort. On MSD Task03 Liver (131 cases,
-CC-BY-SA 4.0):
+reports what disagrees with the rest. On MSD Task03 Liver, 131 cases:
 
 ```
 slice thickness (mm)  0.70 to 5.00   median 1.00
@@ -276,32 +240,25 @@ lesion burden (%)     0.01 to 45.8   median 0.97
 largest lesion Ø (mm) 10 to 241   median 40
 ```
 
-Three things worth drawing out.
+Slice thickness spans 7x inside the one dataset and anisotropy reaches 9:1. Any
+pipeline with kernel sizes in voxels behaves differently across these cases
+without saying so, which is why v1's `np.ones((15, 15))` became a millimetre
+radius.
 
-**Slice thickness spans 7x within one dataset**, and anisotropy reaches 9:1.
-Any pipeline with kernel sizes tuned in voxels behaves differently across this
-cohort without saying so. This is the concrete reason v1's `np.ones((15, 15))`
-had to become a millimetre radius.
+71% of liver labels are not a single connected region, but the median stray
+volume is 8.8 mm³ and the worst case is 0.36% of its organ. `liver_116` reports
+395 components at face-adjacency and 27 at 26-adjacency; 232 of those are single
+voxels touching the main body only at a corner. The count reflects the
+connectivity choice more than the annotation, so the report leads with stray
+volume instead.
 
-**71% of liver labels are not a single connected region** — but the median
-stray volume is 8.8 mm³, and the worst case is 0.36% of its organ.
-`liver_116` reports 395 components at face-adjacency and 27 at 26-adjacency;
-232 of those "components" are single voxels touching the main body only at a
-corner. The count is an artifact of the connectivity choice. Stray volume is
-the number that means something, which is why the report leads with it.
-
-**Fragmentation correlates with low sphericity, but mostly for a boring
-reason.** Across the cohort, `n_components` against sphericity gives Spearman
-ρ = −0.58 (p = 2×10⁻¹³), which invites the conclusion that annotation speckle
-inflates surface area and drags shape metrics down. It does not survive
-scrutiny: `n_components` and tumour burden correlate at ρ = +0.85, so heavily
-diseased livers are both genuinely more irregular *and* more fragmented.
-Controlling for burden, the partial correlation falls to −0.32. A residual
-association remains, but observational data cannot separate "speckle inflates
-area" from "disease does both", and the honest reading is that most of the
-headline effect is confounded.
-
-Reproduce with:
+Fragmentation correlates with low sphericity at Spearman ρ = −0.58
+(p = 2×10⁻¹³), which suggests annotation speckle inflating surface area. That
+reading does not hold up: `n_components` and tumour burden correlate at
+ρ = +0.85, so heavily diseased livers are both genuinely more irregular and more
+fragmented. Controlling for burden drops the partial correlation to −0.32. Some
+association remains, but observational data cannot separate speckle from disease
+here, and most of the headline effect is confounded.
 
 ```bash
 python examples/cohort_report.py /path/to/Task03_Liver \
@@ -309,7 +266,7 @@ python examples/cohort_report.py /path/to/Task03_Liver \
     --out outputs/liver_cohort.jsonl
 ```
 
-Records stream to JSONL and the run resumes from whatever is already there, so
+Records stream to JSONL and a run resumes from whatever is already on disk, so
 an interrupted scan over 131 large volumes keeps its work.
 
 ## Python API
@@ -323,7 +280,7 @@ labels = nrrdvis.load("segmentation.nii.gz")
 
 image.spacing          # (5.0, 0.977, 0.977) mm, as (z, y, x)
 image.extent_mm        # physical field of view
-image.resample(1.0)    # isotropic; extent is preserved, spacing updated
+image.resample(1.0)    # isotropic; extent preserved, spacing updated
 
 liver   = nrrdvis.measure_label(labels, 1, "liver")
 tumours = nrrdvis.measure_components(labels, 2, "tumour", min_volume_mm3=50)
@@ -346,72 +303,48 @@ Preprocessing is declarative, so a run can be recorded next to its output:
 from nrrdvis.preprocess import PreprocessConfig, run
 
 config = PreprocessConfig(window="abdomen", isotropic_mm=1.0, denoise_mm=0.0)
-print(config.describe())   # "resample to 1.0 mm isotropic; body mask with 8.0 mm closing; abdomen window"
+print(config.describe())
+# resample to 1.0 mm isotropic; body mask with 8.0 mm closing; abdomen window
 prepped = run(image, config)
 ```
 
-## What changed from v1
+## Changes from v1
 
-The rewrite was driven by specific defects, not by taste. Each of these is now
+Each of these was a defect with a measurable consequence, and each is now
 covered by a test.
 
-**Spacing was tracked separately from the data.** v1 held voxels in a numpy
-array and millimetres in a `pydicom` dataset, then called `cv2.resize(img,
-(256, 256))`. The array changed shape, the spacing did not, and every
-subsequent measurement was wrong by the resize factor. `Volume` binds the two
-and updates spacing on every geometric operation.
+| v1 | Consequence | v2 |
+|---|---|---|
+| Spacing held in a `pydicom` dataset, voxels in a numpy array, then `cv2.resize(img, (256, 256))` | Array reshaped, spacing did not; every later measurement off by the resize factor | `Volume` binds the two and updates spacing on every geometric operation |
+| Volume as voxel-fraction of the field of view, then divided by 1e6 and called litres | Wrong by a factor of 1000 | Voxel count times true voxel volume; 1 mL is 1000 mm³ |
+| Diameter as the index span of the widest axial slice | Blind to oblique extent and to z entirely | 3-D Feret diameter over the convex hull of the surface voxels |
+| `np.ones((15, 15))` for morphological kernels | Closes a different physical gap on every scanner | Structuring elements in millimetres, converted per volume |
+| Body mask computed per slice | A slice where the body splits in two loses half the anatomy to the largest-component step | Runs on the whole volume |
+| Raw marching cubes into Plotly `create_trisurf` | `temp-plot.html` was 18 MB for one structure | Decimated to a budget, shipped as base64 binary: 902 KB for the five-structure phantom, 1.5 MB for the twelve-structure liver above |
 
-**Volume was estimated from a voxel-fraction of the field of view** — the
-fraction of voxels at 255 times the total scanned volume — and then divided by
-1e6 and labelled litres, which is off by a factor of 1000. It is now a voxel
-count times the true voxel volume, and 1 mL is 1000 mm³.
+Slice ordering deserves its own note, because it is not a theoretical risk. A
+liver CT from TCIA HCC-TACE-Seg is named `00000001.dcm` onward, which sorts
+cleanly, yet 46 of its 88 adjacent pairs are out of anatomical order with a mean
+index displacement of 31 slices. v1 would have reconstructed noise from it
+without raising anything. Ordering now comes from ImagePositionPatient, and a
+test writes a deliberately shuffled series to check it.
 
-**"Diameter" was the widest axial slice's index span.** That ignores oblique
-extent entirely and cannot see the z direction. It is now the true 3-D Feret
-diameter, computed over the convex hull of the surface voxels.
+None of it was runnable elsewhere: every path was `E:/Desktop/`, the patient
+list was `range(1, 21)`, and there was no README, no requirements, no tests, and
+20 MB of generated artifacts in git. Paths are arguments now, dependencies are
+declared, and CI runs the suite on three Python versions.
 
-**Morphological kernels were defined in voxels.** `np.ones((15, 15))` closes a
-different physical gap on every scanner. Structuring elements are now specified
-in millimetres and converted per volume, which on anisotropic data means an
-ellipsoid in voxel space.
-
-**Slices were ordered by filename.** This is not a theoretical risk. A liver CT
-from TCIA (HCC-TACE-Seg) is named `00000001.dcm` onward — perfectly
-natural-sortable — yet **46 of its 88 adjacent pairs are out of anatomical
-order**, with a mean index displacement of 31 slices. v1 would have
-reconstructed noise from it and raised no error. Ordering now comes from
-ImagePositionPatient, and a test writes a deliberately shuffled series to prove
-it.
-
-**Processing was 2-D throughout.** The body mask was computed per slice, so a
-slice where the body split into two blobs — routine at the top and bottom of a
-series — lost half the anatomy to the largest-component step. It now runs on
-the whole volume.
-
-**The viewer did not scale.** Raw marching-cubes output went straight into
-Plotly's `create_trisurf`, which serialises every vertex as decimal text and
-inlines the whole plotly.js bundle. The committed `temp-plot.html` was 18 MB
-for a single structure. Meshes are now decimated to a budget and shipped as
-base64 binary: the five-structure phantom scene is 902 KB, and the twelve-structure
-liver scene above is 1.5 MB.
-
-**Nothing was runnable by anyone else.** Every path was `E:/Desktop/`, the
-patient list was `range(1, 21)`, there was no README, no requirements, no
-tests, and 20 MB of generated artifacts were committed. Paths are arguments,
-dependencies are declared, and CI runs the suite on three Python versions.
-
-Two things v1 imported but never actually contained: a U-Net (the Keras layers
-are imported in every file, but no model is ever defined) and any evaluation
-(the `evaluate` function is commented out). Segmentation is therefore out of
-scope here — this package takes a segmentation as input. Producing one is the
-natural next piece of work.
+Two things v1 imported but never contained: a U-Net (Keras layers are imported
+in every file, but no model is defined) and any evaluation (`evaluate` is
+commented out). Segmentation is out of scope here — this package consumes
+segmentations. Producing them is the next piece of work.
 
 ## Layout
 
 ```
 src/nrrdvis/
 ├── volume.py        Volume: array + spacing + origin, geometry-preserving ops
-├── io.py            DICOM series, NIfTI, NRRD, MetaImage; the (x,y,z)/(z,y,x) flip
+├── io.py            DICOM series, DICOM SEG, NIfTI, NRRD; the (x,y,z)/(z,y,x) flip
 ├── preprocess.py    HU windowing, body extraction, denoising, declarative config
 ├── measure.py       Volumetry, Feret diameter, surface area, sphericity, burden
 ├── mesh.py          Marching cubes, quadric decimation, Taubin smoothing
@@ -426,4 +359,4 @@ src/nrrdvis/
 
 ## Licence
 
-MIT. The datasets it reads carry their own terms; MSD tasks are CC-BY-SA 4.0.
+MIT. Datasets carry their own terms; MSD tasks are CC-BY-SA 4.0.

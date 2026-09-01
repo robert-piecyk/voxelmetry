@@ -1,11 +1,9 @@
-"""Surface extraction: label maps to triangle meshes small enough to ship.
+"""Label maps to triangle meshes.
 
-v1 fed raw marching-cubes output straight into Plotly's ``create_trisurf``. A
-liver at 1 mm produces on the order of half a million triangles, and Plotly
-serialises every vertex as JSON text with the whole plotly.js bundle inlined,
-which is how ``temp-plot.html`` reached 18 MB for a single structure. The mesh
-here is decimated and smoothed before export and written as base64 binary, so a
-complete multi-structure scene lands in a few hundred kilobytes.
+A liver at 1 mm yields on the order of half a million triangles, so meshes are
+decimated to a face budget and smoothed before export, and serialised as base64
+binary rather than JSON number lists. A multi-structure scene lands in a few
+hundred kilobytes.
 """
 
 from __future__ import annotations
@@ -91,17 +89,14 @@ def isosurface(
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Triangulate a binary mask, degrading gracefully when smoothing erases it.
 
-    Pre-smoothing removes the marching-cubes staircase, but a structure only
-    one voxel thick on some axis has its peak intensity pulled below ``level``
-    by that same blur, and the isosurface then comes back empty. At 5 mm slice
-    thickness a lesion confined to a single slice is routine, so this is not an
-    edge case: it would silently report zero surface area and no geometry for
-    exactly the small lesions a reader cares about.
+    Pre-smoothing removes the marching-cubes staircase, but a structure one
+    voxel thick on some axis has its peak pulled below ``level`` by the same
+    blur and the isosurface comes back empty. At 5 mm slice thickness a lesion
+    confined to one slice is routine.
 
     When the smoothed pass yields nothing, this falls back to the unsmoothed
-    mask. That result carries the staircase overestimate, but an approximate
-    surface is strictly better than a false zero, and the caller can tell the
-    difference from the returned sigma.
+    mask. That result carries the staircase overestimate, but is preferable to
+    a false zero; the returned sigma tells the caller which pass was used.
 
     Args:
         mask: Boolean array of the structure, indexed ``[z, y, x]``.
@@ -287,11 +282,11 @@ def _cluster_decimate(mesh: Mesh, target_faces: int, growth: float = 1.0) -> Mes
 def smooth(mesh: Mesh, iterations: int = 10, lambda_: float = 0.5, mu: float = -0.53) -> Mesh:
     """Taubin smoothing: relax the surface without the shrinkage Laplacian causes.
 
-    Plain Laplacian smoothing pulls every vertex toward its neighbours, which
-    steadily contracts a closed surface. Volume measured off such a mesh drifts
-    downward with each iteration. Taubin alternates a positive and a slightly
-    larger negative step, which cancels that low-frequency shrinkage while
-    still removing the high-frequency staircase.
+    Laplacian smoothing pulls every vertex toward its neighbours and contracts
+    a closed surface, so volume measured off the mesh drifts downward with each
+    iteration. Taubin alternates a positive and a slightly larger negative
+    step, cancelling that low-frequency shrinkage while still removing the
+    high-frequency staircase.
 
     Args:
         mesh: The mesh to smooth.

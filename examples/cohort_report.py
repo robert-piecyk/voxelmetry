@@ -7,9 +7,8 @@ pancreas. Output is one JSON record per case plus a printed summary.
     python examples/cohort_report.py /path/to/Task03_Liver \\
         --organ 1 --lesion 2 --workers 16 --out outputs/liver_cohort.json
 
-The point is not the aggregate numbers so much as what falls out of them:
-cases whose geometry disagrees with the rest of the cohort are usually
-telling you something about the data rather than about anatomy.
+Cases whose geometry disagrees with the rest of the cohort usually indicate
+something about the acquisition or the annotation rather than the anatomy.
 """
 
 from __future__ import annotations
@@ -123,10 +122,10 @@ def summarise(records: list[dict], label_names: dict[int, str]) -> str:
     add(f"organ components      {int(parts.min())} to {int(parts.max())}"
         f"   {len(fragmented)} case(s) not a single connected region")
 
-    # Stray volume is the honest measure. Component counts at face-adjacency
-    # are dominated by single voxels that touch the main body at a corner, so
-    # a label can report hundreds of "parts" for a few hundredths of a percent
-    # of its volume.
+    # Component counts at face-adjacency are dominated by single voxels touching
+    # the main body at a corner, so a label can report hundreds of parts for a
+    # few hundredths of a percent of its volume. Stray volume is the usable
+    # figure.
     stray = np.array([
         r["organ"]["volume_mm3"] * (1.0 - r["organ"]["largest_component_fraction"])
         for r in good
@@ -171,9 +170,9 @@ def summarise(records: list[dict], label_names: dict[int, str]) -> str:
             " (components at face-adjacency; 26-adjacency gives far fewer):")
         for record in sorted(fragmented, key=lambda r: -r["organ"]["n_components"])[:8]:
             organ = record["organ"]
-            # The stray volume is the informative number: a fraction that
-            # rounds to 100% says nothing about whether the extra components
-            # are a genuine second lobe or a handful of mislabelled voxels.
+            # A fraction that rounds to 100% cannot distinguish a genuine
+            # second lobe from a handful of mislabelled voxels; the absolute
+            # stray volume can.
             stray_mm3 = organ["volume_mm3"] * (1.0 - organ["largest_component_fraction"])
             add(f"  {record['case_id']:<16} {organ['n_components']:>3} parts,"
                 f" {stray_mm3:>8.1f} mm3 outside the main region"
@@ -210,9 +209,8 @@ def main(argv: list[str] | None = None) -> int:
     cases = dataset.cases[: args.limit]
     print(f"{dataset.name}: {len(cases)} cases, labels {dataset.label_names}", file=sys.stderr)
 
-    # Results stream to JSONL as they land. A run over 131 large volumes takes
-    # long enough that losing everything to an interrupted process is a real
-    # cost, and an already-measured case never needs measuring twice.
+    # Results stream to JSONL as they land, so an interrupted run over 131 large
+    # volumes keeps what it measured and resumes rather than restarting.
     records = read_records(args.out) if args.out else []
     done_ids = {r["case_id"] for r in records if "error" not in r}
     if done_ids:

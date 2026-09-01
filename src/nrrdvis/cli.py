@@ -1,9 +1,7 @@
 """Command-line interface.
 
-Every v1 script hard-coded ``E:/Desktop/test_dataset/`` and a patient range of
-``range(1, 21)``, so running it anywhere else meant editing source. Paths and
-options are arguments here, and nothing is written outside the directory the
-user names.
+Paths and options are arguments; nothing is written outside the directory named
+by the caller.
 """
 
 from __future__ import annotations

@@ -155,10 +155,10 @@
 </nav>
 
 <main>
-<h1>Measuring anatomy you can actually trust</h1>
-<p class="lede">A hands-on guide to <code>nrrdvis</code> — reading medical volumes, measuring them in
-millimetres and litres, and turning any segmentation into a 3-D viewer that fits in a browser tab.
-Every number on this page came out of a real run; nothing is illustrative.</p>
+<h1>Reading, measuring and viewing medical volumes</h1>
+<p class="lede">Working guide to <code>nrrdvis</code>: reading volumes, measuring structures in
+millimetres and litres, and turning a segmentation into a 3-D viewer. All output shown is from real
+runs.</p>
 
 <div>
   <span class="pill"><b>Python</b> 3.10+</span>
@@ -167,9 +167,9 @@ Every number on this page came out of a real run; nothing is illustrative.</p>
   <span class="pill"><b>138</b> tests</span>
 </div>
 
-<h2 id="s0"><span class="n">00</span>Sixty seconds to a picture</h2>
-<p>Install it, then run the demo. It builds a synthetic torso, measures every structure and writes a
-viewer — no download, no data, no configuration.</p>
+<h2 id="s0"><span class="n">00</span>Quick check</h2>
+<p>The demo builds a synthetic torso, measures every structure and writes a viewer. No data
+required.</p>
 
 <div class="block"><div class="bar"><span>shell</span></div><pre>pip install -e ".[all]"
 nrrdvis demo -o demo.html</pre></div>
@@ -185,14 +185,12 @@ bone              30.58       145.3           67.0       0.706      3
 
 * spans under 5 voxels on its thinnest axis; shape figures are indicative only</pre></div>
 
-<p>Open <code>demo.html</code> in any browser. That footnote is the tool telling you something true:
-<code>lesion_3</code> is too thin on its short axis for its <em>shape</em> to mean anything. Its volume
-and diameter are still fine. You will meet that idea repeatedly.</p>
+<p>Open <code>demo.html</code> in a browser. The footnote marks <code>lesion_3</code> as too thin on
+its short axis for its shape figures to mean much; its volume and diameter are unaffected.</p>
 
-<h2 id="s1"><span class="n">01</span>The one idea: geometry travels with the data</h2>
-<p>A medical volume is not an array. It is an array <em>plus</em> the physical spacing needed to
-interpret it. Keep those in separate variables and the first resize silently invalidates every
-measurement you take afterwards.</p>
+<h2 id="s1"><span class="n">01</span>Volumes carry their spacing</h2>
+<p>A volume is voxels plus the millimetres-per-voxel needed to interpret them. Held in separate
+variables, the first resize invalidates every measurement taken afterwards.</p>
 
 <div class="block"><div class="bar"><span>python</span></div><pre>from nrrdvis.phantom import torso_phantom
 
@@ -207,9 +205,9 @@ print(smaller.shape, smaller.extent_mm)</pre></div>
 voxel volume: 5.625 mm³
 (240, 192, 192) (240.0, 192.0, 192.0)</pre></div>
 
-<p>The grid changed from 96×128×128 to 240×192×192. The <strong>physical extent did not move</strong>
-— still 240×192×192 mm. That invariant is the whole design. Axes are always <code>(z, y, x)</code>,
-matching how a DICOM series arrives and what marching cubes expects.</p>
+<p>The grid changed from 96×128×128 to 240×192×192; the physical extent did not, and is still
+240×192×192 mm. Axes are <code>(z, y, x)</code> throughout, matching how a DICOM series arrives and
+what marching cubes expects.</p>
 
 <div class="was"><span class="tag v1">v1</span>The original code held voxels in a NumPy array and
 millimetres in a <code>pydicom</code> dataset, then called <code>cv2.resize(img, (256, 256))</code>.
@@ -247,8 +245,8 @@ nrrdvis.save(vol, "out.nrrd")            # format from the extension</pre></div>
 
 <div class="trap"><p><span class="tag t">trap</span><strong>Never sort DICOM slices by filename.</strong>
 That series is named <code>00000001.dcm</code> through <code>00000090.dcm</code> — perfectly
-natural-sortable. Yet <strong>46 of its 88 adjacent pairs are out of anatomical order</strong>, with a
-mean displacement of 31 slices. Sorting by name reconstructs noise, and raises no error while doing it.
+natural-sortable. Yet 46 of its 88 adjacent pairs are out of anatomical order, with a mean
+displacement of 31 slices. Sorting by name reconstructs noise and raises nothing while doing it.
 <code>load</code> orders by patient position, so this cannot happen.</p></div>
 
 <h2 id="s3"><span class="n">03</span>Measuring a structure</h2>
@@ -278,9 +276,9 @@ sphericity 0.903, 1 part(s)</pre></div>
 <em>fraction of voxels at 255 × total field of view</em>, took "diameter" as the index span of the
 widest axial slice, then divided mm³ by 10⁶ and called the result litres — wrong by a factor of 1000.</div>
 
-<h2 id="s4"><span class="n">04</span>Multifocal disease, one lesion at a time</h2>
-<p>Aggregate statistics mislead when a label holds several separate things. Three lesions 15 mm apart
-report a combined "max diameter" spanning all of them, which is not a diameter of anything.</p>
+<h2 id="s4"><span class="n">04</span>Per-lesion measurement</h2>
+<p>Aggregates mislead when one label holds several separate things: three lesions 15 mm apart report a
+combined max diameter spanning all of them.</p>
 
 <div class="block"><div class="bar"><span>python</span></div><pre>lesions = nrrdvis.measure_components(labels, 2, "lesion", min_volume_mm3=50)
 
@@ -296,12 +294,12 @@ lesion_3: 0.35 mL, Ø 8.4 mm
  'largest_diameter_mm': 16.1, 'sum_of_diameters_mm': 34.9,
  'burden_percent': 0.656}</pre></div>
 
-<p><code>sum_of_diameters_mm</code> is the quantity RECIST tracks between timepoints.
-<code>min_volume_mm3</code> suppresses single-voxel speckle, which matters on predicted segmentations.</p>
+<p><code>sum_of_diameters_mm</code> is what RECIST tracks between timepoints.
+<code>min_volume_mm3</code> suppresses single-voxel speckle in predicted segmentations.</p>
 
-<h2 id="s5"><span class="n">05</span>Seeing it</h2>
-<p>The viewer is label-agnostic. It renders whatever integer labels you hand it — liver, spleen, a
-thirty-structure whole-body segmentation. Nothing in it knows what an organ is.</p>
+<h2 id="s5"><span class="n">05</span>The viewer</h2>
+<p>The viewer renders whatever integer labels it is given, from one structure to a thirty-structure
+whole-body segmentation. Nothing in it is organ-specific.</p>
 
 <div class="block"><div class="bar"><span>shell</span></div><pre>nrrdvis view segmentation.nii.gz -o scene.html \
     --labels "1=liver,2=tumour" --split 2 --min-volume 100</pre></div>
@@ -327,11 +325,11 @@ write(scene, "scene.html")</pre></div>
 <figure>
   <img src="hepatic_montage.png" alt="A liver shown solid, then at 16 percent opacity revealing branching vessel trees and metastases inside it, then with the liver hidden entirely">
   <figcaption>The same scene at three opacity settings, from a clinical DICOM SEG. Drag to orbit,
-  scroll to zoom, shift-drag to pan; a clip plane cuts along any anatomical axis. The output is one
-  self-contained HTML file with a single external dependency.</figcaption>
+  scroll to zoom, shift-drag to pan; the clip plane cuts along any anatomical axis. Output is one
+  HTML file with a single external dependency.</figcaption>
 </figure>
 
-<p>Those disconnected vessel stubs are not a rendering fault — see §09.</p>
+<p>The disconnected vessel stubs are not a rendering fault; see §09.</p>
 
 <div class="was"><span class="tag v1">v1</span>Fed raw marching-cubes output into Plotly's
 <code>create_trisurf</code>, which serialises every vertex as decimal text and inlines the whole
@@ -353,13 +351,13 @@ table before windowing so the body mask sees true Hounsfield units, and window l
 the HU scale. Named windows: <code>abdomen</code>, <code>liver</code>, <code>lung</code>,
 <code>bone</code>, <code>brain</code>, <code>mediastinum</code>.</p>
 
-<div class="note"><p><strong>Structuring elements are millimetres, not voxels.</strong> A 10 mm closing
-bridges 10 mm whether your slices are 0.7 mm or 5 mm apart. On anisotropic data that means an ellipsoid
-in voxel space — which is the point.</p></div>
+<div class="note"><p>Structuring elements are specified in millimetres, not voxels. A 10 mm closing
+bridges 10 mm whether slices are 0.7 mm or 5 mm apart, which on anisotropic data means an ellipsoid in
+voxel space.</p></div>
 
-<h2 id="s7"><span class="n">07</span>When it isn't CT</h2>
-<p>Hounsfield units are calibrated: air sits near −1000, soft tissue near 0. MR, ultrasound and
-already-normalised data share none of that. The package checks before assuming.</p>
+<h2 id="s7"><span class="n">07</span>Non-CT data</h2>
+<p>Hounsfield units are calibrated, with air near −1000 and soft tissue near 0. MR, ultrasound and
+already-normalised data share none of that scale, so the relevant functions check first.</p>
 
 <div class="block"><div class="bar"><span>python</span></div><pre>from nrrdvis.preprocess import is_hounsfield, apply_window
 
@@ -374,12 +372,11 @@ ValueError: 'liver_mr' does not look like Hounsfield units (range 0 to 831), so
 the 'abdomen' window would clip away most of its range. Use window="percentile"
 for MR or other uncalibrated data, or pass an explicit (level, width).</pre></div>
 
-<div class="trap"><p><span class="tag t">trap</span><strong>Both failures used to be silent.</strong>
-On that real liver MR, <code>body_mask</code> selected <strong>87% of the field of view</strong> —
-every voxel is "above −320 HU" — and the abdomen window collapsed everything from 240 to 831 into a
-single value. Now <code>body_mask</code> detects uncalibrated data and falls back to an Otsu threshold
-(37.9% on the same scan), and the HU window refuses rather than quietly destroying your dynamic
-range.</p></div>
+<div class="trap"><p><span class="tag t">trap</span>Both failures used to be silent. On that liver MR,
+<code>body_mask</code> selected 87% of the field of view, since every voxel is above −320 HU, and the
+abdomen window collapsed everything from 240 to 831 into a single value. <code>body_mask</code> now
+detects uncalibrated data and falls back to Otsu (37.9% on the same scan), and the HU window refuses
+rather than destroying the dynamic range.</p></div>
 
 <h2 id="s8"><span class="n">08</span>A whole cohort at once</h2>
 <p><code>examples/cohort_report.py</code> measures every case in a dataset in parallel and reports what
@@ -402,31 +399,31 @@ lesions per case      1 to 62   median 3   total 753
 lesion burden (%)     0.01 to 45.8   median 0.97
 largest lesion Ø (mm) 10 to 241   median 40</pre></div>
 
-<p>Slice thickness spans <strong>7× inside a single dataset</strong>. Any pipeline with kernels tuned in
-voxels behaves differently across these cases without telling you.</p>
+<p>Slice thickness spans 7× inside a single dataset. Any pipeline with kernels tuned in voxels
+behaves differently across these cases without saying so.</p>
 
-<h2 id="s9"><span class="n">09</span>Five traps worth knowing</h2>
-<p>Each of these was found by running on real data, and each is now covered by a test.</p>
+<h2 id="s9"><span class="n">09</span>Traps</h2>
+<p>Each was found running on real data and is covered by a test.</p>
 
 <h3>Component counts are a connectivity artifact</h3>
-<p>One real liver label reports <strong>395 components at face-adjacency and 27 at 26-adjacency</strong>.
-232 of those "components" are single voxels touching the main body only at a corner. Total stray volume:
-0.04%. Read <code>largest_component_fraction</code>, or the stray volume derived from it, not the count.</p>
+<p>One liver label reports 395 components at face-adjacency and 27 at 26-adjacency. 232 of those are
+single voxels touching the main body only at a corner, for 0.04% of the volume. Read
+<code>largest_component_fraction</code>, or the stray volume derived from it, not the count.</p>
 
 <h3>Anisotropy fragments tubular structures</h3>
-<p>In the picture above, the hepatic vein reports <strong>150 components, largest holding 46%</strong>.
-That is not annotation noise: at 0.887 mm in-plane against 5 mm between slices, a 3 mm vessel is sampled
-as isolated cross-sections. The geometry is telling you about the acquisition.</p>
+<p>In the picture above the hepatic vein reports 150 components, largest holding 46%. That is the
+acquisition, not the annotation: at 0.887 mm in-plane against 5 mm between slices, a 3 mm vessel is
+sampled as isolated cross-sections.</p>
 
 <h3>Shape descriptors need about five voxels</h3>
-<p>Below roughly five voxels across its thinnest axis, a structure's surface area and sphericity are
-dominated by sampling artifacts. Volume and diameter stay usable. Those rows carry
-<code>resolution_limited</code> and are marked with an asterisk rather than being presented as fact.</p>
+<p>Below roughly five voxels across the thinnest axis, surface area and sphericity are dominated by
+sampling artifacts; volume and diameter stay usable. Those rows carry <code>resolution_limited</code>
+and are marked with an asterisk.</p>
 
 <h3>Marching cubes on a binary mask overestimates area by 9%</h3>
 <p>A hard 0/1 mask traces a staircase. A 0.8-voxel Gaussian pre-smooth holds the error under 1% across
-the radii tested. But that same blur erases structures one voxel thick, so the isosurface falls back to
-an unsmoothed pass rather than reporting zero — at 5 mm slice spacing, a single-slice lesion is routine.</p>
+the radii tested, but the same blur erases structures one voxel thick, so the isosurface falls back to an
+unsmoothed pass rather than returning zero. At 5 mm slice spacing a single-slice lesion is routine.</p>
 
 <h3>Flattening an overlapping DICOM SEG destroys segments</h3>
 <p>DICOM SEG permits overlap; an integer label map cannot represent it.</p>
@@ -436,9 +433,9 @@ dicom_seg_masks()  2417 mL   in 1 part            ← correct</pre></div>
 Overlap now raises a warning naming what each segment lost, <code>priority=</code> chooses which wins,
 and <code>dicom_seg_masks()</code> keeps them all.</p>
 
-<h2 id="s10"><span class="n">10</span>How the numbers are checked</h2>
-<p>Measurement code checked only against itself will be self-consistently wrong. The phantom generator
-emits shapes with closed-form geometry, and the tests assert against that arithmetic.</p>
+<h2 id="s10"><span class="n">10</span>Validation</h2>
+<p>The phantom generator emits shapes with closed-form geometry, and the tests assert against that
+arithmetic rather than against the code's own output.</p>
 
 <div class="scroll"><table>
 <tr><th>Property</th><th class="num">Result</th></tr>
@@ -451,8 +448,8 @@ emits shapes with closed-form geometry, and the tests assert against that arithm
 <tr><td>Volume after 20 Taubin smoothing passes</td><td class="num">within 0.5%</td></tr>
 </table></div>
 
-<p>That last row is why smoothing is Taubin and not Laplacian: Laplacian contracts a closed surface a
-little on every iteration, so volume measured off a smoothed mesh drifts steadily downward.</p>
+<p>The last row is why smoothing is Taubin and not Laplacian. Laplacian contracts a closed surface
+slightly on every iteration, so volume measured off a smoothed mesh drifts downward.</p>
 
 <div class="block"><div class="bar"><span>shell</span></div><pre>pytest              # 138 tests, incl. 39 headless checks on the generated viewer
 ruff check src tests examples</pre></div>

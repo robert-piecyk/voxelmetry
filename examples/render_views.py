@@ -1,8 +1,7 @@
 """Render static views of a scene, for READMEs and slides.
 
-The interactive viewer is the product; this exists because a repository page
-and a slide deck cannot embed one. It draws the same meshes the viewer draws,
-through the same scene assembly, so the pictures cannot drift from the tool.
+Draws the same meshes as the interactive viewer, through the same scene
+assembly, for contexts that cannot embed one.
 
     python examples/render_views.py segmentation.nii.gz \\
         --labels "1=liver,2=tumour" --split 2 --out docs/liver
@@ -126,8 +125,8 @@ def montage(
 ) -> Path:
     """Tile rendered views into one image, each trimmed to its own content.
 
-    Panels are cropped to their subject before tiling, so a small structure
-    does not become a stamp adrift in a field of background.
+    Panels are cropped to their subject before tiling, so a small structure does
+    not end up surrounded by background.
 
     Args:
         paths: Rendered PNGs, in order.

@@ -1,12 +1,12 @@
 """Synthetic volumes with known analytic geometry.
 
-These exist so the measurement code can be checked against arithmetic rather
-than against itself. A sphere of radius r has volume 4/3 pi r^3 and surface
-area 4 pi r^2 exactly, so any drift in the voxel-counting, resampling or
-marching-cubes paths shows up immediately as a percentage error.
+A sphere of radius r has volume 4/3 pi r^3 and surface area 4 pi r^2 exactly,
+which gives the tests a reference independent of the code under test. Drift in
+the voxel-counting, resampling or marching-cubes paths shows up as a percentage
+error against those closed forms.
 
-They double as a demo dataset: the CLI and viewer run end-to-end on a phantom
-with no download required.
+They also serve as the demo dataset, so the CLI and viewer run end-to-end with
+no download.
 """
 
 from __future__ import annotations

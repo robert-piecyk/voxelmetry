@@ -70,10 +70,10 @@ def load(path: str | Path, name: str | None = None) -> Volume:
 def load_dicom_series(directory: str | Path, name: str | None = None) -> Volume:
     """Load a DICOM series as one volume, ordered by slice position.
 
-    Slice ordering comes from ImagePositionPatient rather than filename. The v1
-    code sorted filenames with a natural-sort key, which happens to work for
-    ``image_0``..``image_128`` but silently produces a scrambled or mirrored
-    volume for any series whose filenames do not encode acquisition order.
+    Ordering comes from ImagePositionPatient, not filename. Filenames often do
+    not encode acquisition order: one TCIA liver CT named ``00000001.dcm``
+    onward has 46 of 88 adjacent pairs out of order, which a natural-sort key
+    would reconstruct as noise without raising anything.
 
     Args:
         directory: Folder containing the ``.dcm`` files of a single series.
@@ -155,24 +155,17 @@ def load_dicom_seg(
 ) -> tuple[Volume, dict[int, str]]:
     """Read a DICOM Segmentation object into a label map and its segment names.
 
-    DICOM SEG is how segmentations travel between clinical systems, and it is
-    not a volume: it is a multi-frame object where each frame carries one
-    segment on one slice, present only where that segment is non-empty. The
-    frames must be reassembled against their patient positions to become a
-    grid, which is what this does.
+    A SEG is a multi-frame object, not a volume: each frame carries one segment
+    on one slice, stored only where that segment is non-empty. Frames are
+    reassembled against their patient positions to form a grid.
 
-    Overlap is the one place a choice has to be made. DICOM SEG permits
-    segments to overlap -- a tumour inside a liver is stored in both -- while
-    an integer label map cannot represent that. Segments are written in
-    ``priority`` order, later ones winning, which suits the usual authoring
-    order of organ first and structures inside it after.
-
-    That flattening can badly misrepresent a heavily overlapping SEG, so it is
-    never silent: if any voxel is claimed by more than one segment, a warning
-    names the segments and how much each lost. A real Colorectal-Liver-
-    Metastases SEG carries both "Liver" and "Liver Remnant" over largely the
-    same voxels, and flattening leaves "Liver" as 767 disconnected fragments.
-    Use :func:`dicom_seg_masks` when segments genuinely overlap.
+    DICOM SEG permits overlapping segments; an integer label map cannot
+    represent them. Segments are written in ``priority`` order with later ones
+    winning, which suits the usual authoring order of organ first. Overlap is
+    never silent: if any voxel is claimed twice, a warning names the segments
+    and how many voxels each lost. On a Colorectal-Liver-Metastases SEG,
+    "Liver" and "Liver Remnant" cover largely the same voxels and flattening
+    leaves "Liver" as 767 fragments. Use :func:`dicom_seg_masks` instead.
 
     Args:
         path: The ``.dcm`` SEG file, or a directory holding exactly one.

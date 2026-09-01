@@ -1,11 +1,8 @@
-"""Morphometry: turn a label map into a table of physical measurements.
+"""Physical measurements for the labels in a segmentation.
 
-This is the part of v1 worth keeping. That version computed liver volume as
-``fraction_of_voxels_at_255 * total_field_of_view``, found "diameter" by taking
-the widest single axial slice and subtracting index positions, and reported the
-result in the wrong units (it divided mm3 by 1e6 and called it litres, which is
-off by a factor of 1000). All three are fixed here, and every number is derived
-from voxel counts times the true voxel volume.
+Volumes are voxel counts times the true voxel volume; distances are in
+millimetres derived from the volume's spacing. Nothing here depends on the
+voxel grid, so the same anatomy measures the same on any resampling.
 """
 
 from __future__ import annotations
@@ -57,14 +54,13 @@ def measure_label(
             when counting connected components.
 
     Note:
-        ``n_components`` is strongly sensitive to ``connectivity`` and should
-        not be read as a fragmentation score on its own. A ragged annotation
-        boundary leaves single voxels touching the main body only at a corner:
-        face-adjacency counts each as its own component, 26-adjacency absorbs
-        them. One real liver label in MSD Task03 reports 395 components at
-        connectivity 1 and 27 at connectivity 3, for 0.04% of its volume.
-        ``largest_component_fraction`` -- or the stray volume derived from it
-        -- is the figure that means something.
+        ``n_components`` is sensitive to ``connectivity`` and is not a
+        fragmentation score on its own. A ragged boundary leaves single voxels
+        touching the main body only at a corner; face-adjacency counts each as
+        a component, 26-adjacency absorbs them. One MSD Task03 liver label
+        gives 395 at connectivity 1 and 27 at connectivity 3, for 0.04% of its
+        volume. Use ``largest_component_fraction``, or the stray volume derived
+        from it.
 
     Returns:
         A :class:`LabelMeasurement`. Empty labels yield an all-zero record
@@ -118,10 +114,10 @@ def measure_label(
     if surface_area > 0:
         equivalent_sphere_area = np.pi ** (1 / 3) * (6 * volume_mm3) ** (2 / 3)
         sphericity = float(equivalent_sphere_area / surface_area)
-        # Values above 1 are geometrically impossible: no shape beats a sphere
-        # on area-to-volume. They only appear when smoothing has shaved area
-        # off a structure too small to resolve, so clamp and let the
-        # resolution_limited flag carry the warning instead of a silent lie.
+        # Values above 1 are impossible; no shape beats a sphere on
+        # area-to-volume. They appear only when smoothing has shaved area off a
+        # structure too small to resolve, so clamp and let resolution_limited
+        # carry the caveat.
         sphericity = min(sphericity, 1.0)
     else:
         sphericity = 0.0
@@ -164,12 +160,11 @@ def measure_all(
     return [measure_label(labelmap, label, names.get(label)) for label in present]
 
 
-#: Gaussian width, in voxels, applied before isosurfacing a binary mask.
-#: Marching cubes on a hard 0/1 mask still traces a staircase and overestimates
-#: area by ~9%. Pre-smoothing relaxes the surface onto the underlying shape.
-#: Calibrated against analytic spheres (see tests/test_measure.py): 0.8 holds
-#: the error under 1% for radii from 15 to 30 voxels, where 0 gives +8.6% and
-#: 1.5 starts eroding genuinely sharp features.
+#: Gaussian width in voxels, applied before isosurfacing a binary mask.
+#: Marching cubes on a hard 0/1 mask traces a staircase and overestimates area
+#: by ~9%. Calibrated against analytic spheres (tests/test_measure.py): 0.8
+#: holds the error under 1% for radii 15-30 voxels; 0 gives +8.6% and 1.5
+#: starts eroding sharp features.
 SURFACE_SMOOTHING_SIGMA = 0.8
 
 #: Below this many voxels across its thinnest axis, a structure's shape
@@ -300,10 +295,9 @@ def measure_components(
 ) -> list[LabelMeasurement]:
     """Measure each connected component of a label separately.
 
-    Aggregate statistics mislead for multifocal structures: three separate
-    lesions 15 mm apart report a combined "max diameter" spanning all of them,
-    which is not a diameter of anything. Lesion burden is reported per lesion
-    (as RECIST does), so this splits the label first.
+    Aggregates mislead for multifocal structures: three lesions 15 mm apart
+    report a combined max diameter spanning all of them. Burden is reported per
+    lesion, as RECIST does, so the label is split first.
 
     Args:
         labelmap: Integer-valued segmentation volume.
@@ -331,12 +325,10 @@ def measure_components(
     order = np.argsort(sizes)[::-1]
     min_voxels = min_volume_mm3 / labelmap.voxel_volume_mm3
 
-    # Every component is measured inside its own bounding box. Measured on the
-    # full grid instead, a 1 mL lesion in a 165-million-voxel study costs about
-    # ten seconds -- marching cubes, erosion and the component pass all sweep
-    # the entire array for a structure occupying a thousandth of a percent of
-    # it. find_objects hands back every bounding box in one pass, so the work
-    # per component becomes proportional to the component.
+    # Each component is measured inside its own bounding box. On the full grid
+    # a 1 mL lesion in a 165-million-voxel study costs ~10 s, since marching
+    # cubes, erosion and the component pass each sweep the whole array.
+    # find_objects returns every bounding box in one pass.
     boxes = ndimage.find_objects(components)
     pad = [max(int(round(2.0 * max(labelmap.spacing) / s)), 1) for s in labelmap.spacing]
     origin = np.asarray(labelmap.origin, dtype=float)

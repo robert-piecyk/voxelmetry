@@ -1,12 +1,9 @@
 """Volumetric preprocessing: HU windowing, body extraction, denoising.
 
-The v1 pipeline ran slice by slice and defined every morphological kernel in
-voxels: ``np.ones((15, 15))`` for closing, ``np.ones((25, 25))`` for dilation.
-Those numbers were tuned against one scanner's 0.57 mm pixels, so on a series
-with 0.7 mm pixels the same code closes a 30% smaller physical gap. Kernels
-here are specified in millimetres and converted per-volume, which makes the
-behaviour identical across scanners and is the single change that matters most
-for reproducibility.
+Morphological kernels are specified in millimetres and converted per volume, so
+a given radius closes the same physical gap regardless of voxel size. On
+anisotropic data that means an ellipsoid in voxel space. Operations run on the
+whole volume rather than slice by slice.
 """
 
 from __future__ import annotations
@@ -152,13 +149,11 @@ def body_mask(
 ) -> np.ndarray:
     """Segment the patient's body, discarding air, table and scanner artefacts.
 
-    The approach is v1's: threshold, take the largest connected component, then
-    close. What changed is that it now runs on the whole volume at once rather
-    than per slice, so a slice where the body happens to split into two blobs
-    (common at the very top and bottom of a series) no longer loses half the
-    anatomy. The v1 version also thresholded with Otsu after histogram
-    equalisation, which is scan-dependent; a fixed HU threshold is meaningful
-    because Hounsfield units are already calibrated to physical density.
+    Threshold, take the largest connected component, close the result. Runs on
+    the whole volume rather than per slice, so a slice where the body splits
+    into two blobs -- common at the ends of a series -- does not lose half the
+    anatomy to the largest-component step. A fixed HU threshold is meaningful
+    because Hounsfield units are calibrated to physical density.
 
     Args:
         volume: Input CT volume in Hounsfield units.
@@ -196,14 +191,11 @@ def body_mask(
 
     if closing_mm > 0:
         structure = _ball_voxels(closing_mm, volume.spacing)
-        # Closing dilates then erodes, and scipy treats everything outside the
-        # array as background during the erosion. A body that extends through
-        # the edge of the field of view -- which is every abdominal CT at the
-        # top and bottom of the slab, and most at the sides -- is therefore
-        # eaten away at the border. Measured on a real TCIA liver CT, an 8 mm
-        # closing emptied the first and last slices completely: 47% of the
-        # first slice became 0%. Padding with foreground first makes the
-        # erosion see tissue continuing past the edge, which is the truth.
+        # Closing dilates then erodes, and scipy treats outside-the-array as
+        # background during the erosion, so a body extending through the edge
+        # of the field of view is eaten at the border. On a TCIA liver CT an
+        # 8 mm closing emptied the first and last slices entirely (47% -> 0%).
+        # Edge padding lets the erosion see tissue continuing past the edge.
         pad = [(n // 2 + 1, n // 2 + 1) for n in structure.shape]
         padded = np.pad(tissue, pad, mode="edge")
         padded = ndimage.binary_closing(padded, structure=structure)
@@ -246,10 +238,9 @@ def remove_table(
 def denoise(volume: Volume, strength: float = 1.0, method: str = "gaussian") -> Volume:
     """Reduce noise while keeping spacing meaningful.
 
-    v1 used BM3D at ``sigma_psd=30/255`` on every slice. BM3D is excellent but
-    costs seconds per slice, which put a 130-slice study into the tens of
-    minutes and made the pipeline impractical to re-run. These alternatives are
-    seconds per volume.
+    All three methods run in seconds per volume. BM3D, which the original
+    pipeline used per slice, costs seconds per slice and puts a 130-slice study
+    into the tens of minutes.
 
     Args:
         volume: Input volume.

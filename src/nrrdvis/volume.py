@@ -1,10 +1,8 @@
-"""The central abstraction: a 3-D array that never loses its physical spacing.
+"""A 3-D array bound to its physical spacing.
 
-The v1 scripts kept voxel data in bare ``numpy`` arrays and the millimetre
-spacing in a separate ``pydicom`` dataset. Every ``cv2.resize`` silently
-invalidated that spacing, so any measurement taken after a resize was wrong by
-whatever factor the resize applied. :class:`Volume` binds the two together and
-updates spacing on every geometric operation.
+Voxel data and millimetres-per-voxel are held together and updated as a unit,
+so a resample or crop cannot leave the two inconsistent. Every geometric
+operation returns a new :class:`Volume` with corrected spacing and origin.
 """
 
 from __future__ import annotations
