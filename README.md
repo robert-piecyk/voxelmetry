@@ -4,13 +4,9 @@ Reads medical image volumes, measures the structures in them in millimetres and
 litres, and writes an interactive 3-D viewer as a single HTML file. Works on any
 integer-labelled segmentation — CT or MR, one structure or thirty.
 
-[Field guide](https://claude.ai/code/artifact/80b90f0e-7428-4d63-a7bb-de809e1d3c5a)
-is the tutorial; a copy lives in [`docs/tutorial.html`](docs/tutorial.html).
-Two viewers built from public data with the commands below:
-[MSD liver_108](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)
-(57 tumours, 43% hepatic burden) and
-[a clinical DICOM SEG](https://claude.ai/code/artifact/74d55290-1449-4e58-bb86-f1ce26e77257)
-(liver, both vein trees, five metastases).
+[`docs/tutorial.html`](docs/tutorial.html) is the field guide: loading,
+measuring, viewing, and the traps that show up on real scans. Open it in a
+browser or serve `docs/`.
 
 ![Liver, hepatic and portal vein trees and five metastases, shown solid, with the liver at 16% opacity, and with the liver hidden](docs/hepatic_montage.png)
 
