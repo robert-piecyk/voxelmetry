@@ -7,6 +7,10 @@ Point it at any labelled segmentation — CT or MR, one structure or thirty — 
 it measures every label in physical units and writes a self-contained HTML page
 you can open, share or host.
 
+**[Field guide →](https://claude.ai/code/artifact/80b90f0e-7428-4d63-a7bb-de809e1d3c5a)** — the
+hands-on tutorial: loading, measuring, viewing, and the five traps that bite on real scans. Also in
+this repo as [`docs/tutorial.html`](docs/tutorial.html).
+
 Two live demos, both built from real public data by the commands below:
 
 - **[Liver Morphometry Viewer](https://claude.ai/code/artifact/dd3c0ad8-4808-4401-b0c0-db9e03193149)**
